@@ -11,6 +11,11 @@
   :root {
     --bg: #FAFAF9; --surface: #FFFFFF; --line: #E7E5E4; --ink: #1C1917;
     --muted: #78716C; --bad: #DC2626; --good: #16A34A; --fill: #F5F5F4;
+    /* Brand tokens. PROVISIONAL: replace with official GRIMME values from the brand guide. */
+    --brand: #C8102E;        /* GRIMME red: logo, active nav, primary button only */
+    --chart-1: #3A3A3A;      /* graphite: planned service */
+    --chart-2: #C9C9C9;      /* light grey: emergency reserve */
+    --chart-bg: #F2F2F2;     /* off-season band */
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -37,7 +42,7 @@
   .seg { display: inline-flex; background: var(--fill); border-radius: 8px; padding: 2px; }
   .seg button { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
   .seg button:hover { color: var(--ink); }
-  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line), inset 0 -2px 0 var(--brand); }
   .seg.months { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; margin-bottom: 12px; }
   .seg.months button { padding: 6px 0; }
 
@@ -73,8 +78,8 @@
   .site .name { font-weight: 500; }
   .site .total { text-align: right; font-weight: 600; font-size: 16px; }
   .bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--fill); }
-  .bar .reg { background: var(--ink); }
-  .bar .res { background: #D6D3D1; }
+  .bar .reg { background: var(--chart-1); }
+  .bar .res { background: var(--chart-2); }
   .bar + .label { margin-top: 6px; }
   .legend { display: flex; gap: 20px; }
   .legend span { display: inline-flex; align-items: center; gap: 8px; }
@@ -103,8 +108,8 @@
   .btn { display: block; width: 100%; height: 36px; border-radius: 8px; font-weight: 500; border: 1px solid var(--line); }
   .btn:hover { background: var(--bg); }
   .btn + .btn { margin-top: 8px; }
-  .btn.primary { background: var(--ink); color: #FFFFFF; border-color: var(--ink); }
-  .btn.primary:hover { background: #292524; }
+  .btn.primary { background: var(--brand); color: #FFFFFF; border-color: var(--brand); }
+  .btn.primary:hover { filter: brightness(0.92); }
   .btn:disabled { color: var(--muted); cursor: default; background: none; }
   .note { margin-bottom: 12px; }
   .overview { display: grid; grid-template-columns: 5fr 7fr; gap: 24px; align-items: start; }
@@ -117,7 +122,9 @@
   .side { border-right: 1px solid var(--line); background: var(--surface); padding: 24px 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 28px; }
   .logo { display: flex; align-items: center; height: 32px; padding: 0 8px; }
   .logo img { height: 22px; }
-  .logo .word { font-weight: 600; letter-spacing: 0.14em; font-size: 15px; }
+  .logo .word { font-weight: 700; letter-spacing: 0.08em; font-size: 18px; color: var(--brand); }
+  .side { border-top: 3px solid var(--brand); }
+  .nav a.active { color: var(--ink); background: var(--bg); box-shadow: inset 2px 0 0 var(--brand); }
   .nav { display: grid; gap: 2px; }
   .nav a { display: block; padding: 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-weight: 500; }
   .nav a:hover { background: var(--bg); color: var(--ink); }
@@ -147,7 +154,7 @@
 <nav class="side" aria-label="Navigation">
   <div class="logo"><img src="grimme-logo.svg" alt="GRIMME" onerror="this.outerHTML='<span class=&quot;word&quot;>GRIMME</span>'"></div>
   <div class="nav">
-    <a href="#top">Dashboard</a>
+    <a href="#top" class="active">Dashboard</a>
     <a href="#maschinen">Maschinen</a>
     <a href="#uebersicht">Übersicht</a>
     <a href="#standorte">Standorte</a>
@@ -416,8 +423,8 @@ function renderSites(t) {
       <div class="total num">${eur(s.total)}</div>
     </div>`).join('') + `
     <div class="legend label">
-      <span><span class="swatch" style="background:var(--ink)"></span>Geplanter Service</span>
-      <span><span class="swatch" style="background:#D6D3D1"></span>Notfall-Reserve</span>
+      <span><span class="swatch" style="background:var(--chart-1)"></span>Geplanter Service</span>
+      <span><span class="swatch" style="background:var(--chart-2)"></span>Notfall-Reserve</span>
     </div>`;
 }
 
@@ -467,15 +474,15 @@ function renderMonthChart(t) {
   const y = v => pt + (H - pt - pb) * (1 - v / max);
   const ticks = [0, 0.5, 1].map(f => max / 1.1 * f);
   let g = ticks.map(v => `<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#E7E5E4"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${nf.format(Math.round(v / 1000))}k</text>`).join('');
-  g += `<rect x="${pl + bw}" y="${pt}" width="${bw * 4}" height="${H - pt - pb}" fill="#F5F5F4"/><text x="${pl + bw * 3}" y="${pt + 14}" text-anchor="middle">Nebensaison</text>`;
+  g += `<rect x="${pl + bw}" y="${pt}" width="${bw * 4}" height="${H - pt - pb}" fill="var(--chart-bg)"/><text x="${pl + bw * 3}" y="${pt + 14}" text-anchor="middle">Nebensaison</text>`;
   g += reg.map((v, i) => {
     const x = pl + i * bw + bw * 0.22, w = bw * 0.56;
-    return `<rect x="${x}" y="${y(v)}" width="${w}" height="${y(0) - y(v)}" fill="#1C1917" rx="2"><title>${MONTHS[i]}: Service ${eur(v)}</title></rect>` +
-      (res[i] ? `<rect x="${x}" y="${y(v + res[i])}" width="${w}" height="${y(v) - y(v + res[i])}" fill="#D6D3D1" rx="2"><title>${MONTHS[i]}: Reserve ${eur(res[i])}</title></rect>` : '') +
+    return `<rect x="${x}" y="${y(v)}" width="${w}" height="${y(0) - y(v)}" fill="var(--chart-1)" rx="2"><title>${MONTHS[i]}: Service ${eur(v)}</title></rect>` +
+      (res[i] ? `<rect x="${x}" y="${y(v + res[i])}" width="${w}" height="${y(v) - y(v + res[i])}" fill="var(--chart-2)" rx="2"><title>${MONTHS[i]}: Reserve ${eur(res[i])}</title></rect>` : '') +
       `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${MONTHS[i]}</text>`;
   }).join('');
   document.getElementById('monthChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Kosten pro Monat">${g}</svg>`;
-  document.getElementById('monthLegend').innerHTML = `<span class="legend"><span><span class="swatch" style="background:var(--ink)"></span>Service</span><span><span class="swatch" style="background:#D6D3D1"></span>Reserve</span></span>`;
+  document.getElementById('monthLegend').innerHTML = `<span class="legend"><span><span class="swatch" style="background:var(--chart-1)"></span>Service</span><span><span class="swatch" style="background:var(--chart-2)"></span>Reserve</span></span>`;
 }
 
 function renderKpiStack(t) {
@@ -492,7 +499,7 @@ function renderDonut(t) {
   document.getElementById('donut').innerHTML = `
     <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label="Planbarer Anteil">
       <circle cx="66" cy="66" r="${R}" fill="none" stroke="#E7E5E4" stroke-width="12"/>
-      <circle cx="66" cy="66" r="${R}" fill="none" stroke="#1C1917" stroke-width="12" stroke-dasharray="${C * share} ${C}" transform="rotate(-90 66 66)"/>
+      <circle cx="66" cy="66" r="${R}" fill="none" stroke="var(--chart-1)" stroke-width="12" stroke-dasharray="${C * share} ${C}" transform="rotate(-90 66 66)"/>
       <text x="66" y="72" text-anchor="middle" style="font-size:20px;font-weight:600;fill:#1C1917">${pct(share)}</text>
     </svg>
     <dl class="split num" style="flex:1">
@@ -514,7 +521,7 @@ function renderScenarioChart() {
   const bw = W / 3;
   document.getElementById('scnChart').innerHTML = `<svg viewBox="0 0 ${W} ${H + 56}" width="100%" role="img" aria-label="Szenarien"><g transform="translate(0 20)">${vals.map((x, i) => {
     const h = H * (x.v - min) / (max - min) * 0.75 + H * 0.2, cur = x.k === state.scenario;
-    return `<rect x="${i * bw + bw * 0.25}" y="${H - h}" width="${bw * 0.5}" height="${h}" rx="3" fill="${cur ? '#1C1917' : '#D6D3D1'}"/>
+    return `<rect x="${i * bw + bw * 0.25}" y="${H - h}" width="${bw * 0.5}" height="${h}" rx="3" fill="${cur ? 'var(--chart-1)' : 'var(--chart-2)'}"/>
       <text x="${i * bw + bw / 2}" y="${H - h - 6}" text-anchor="middle" style="${cur ? 'fill:#1C1917' : ''}">${nf.format(Math.round(x.v / 1000))}k €</text>
       <text x="${i * bw + bw / 2}" y="${H + 18}" text-anchor="middle" style="${cur ? 'fill:#1C1917;font-weight:600' : ''}">${SCENARIOS[x.k].label}</text>`;
   }).join('')}</g></svg>`;
