@@ -108,6 +108,12 @@
   .btn.primary:hover { background: #292524; }
   .btn:disabled { color: var(--muted); cursor: default; background: none; }
   .note { margin-bottom: 12px; }
+  .overview { display: grid; grid-template-columns: 5fr 7fr; gap: 24px; align-items: start; }
+  .overview td, .overview th { white-space: nowrap; }
+  .overview th { padding: 12px 16px; }
+  .overview td { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .overview tbody tr:last-child td { border-bottom: 0; }
+  .overview tfoot td { padding: 10px 16px; border-top: 1px solid var(--line); font-weight: 600; }
   .history th { padding: 6px 0; border-bottom: 0; }
   .history td { padding: 8px 0; border-top: 1px solid var(--line); }
 </style>
@@ -138,6 +144,14 @@
         <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
       </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Übersicht</h2><span class="label">Szenario folgt Auswahl</span></div>
+    <div class="overview">
+      <div class="card"><table id="bySite"></table></div>
+      <div class="card"><table id="byType"></table></div>
     </div>
   </section>
 
@@ -350,6 +364,30 @@ function renderSites(t) {
     </div>`;
 }
 
+function groupTable(id, title, rows, keyFn, keys) {
+  const groups = keys.map(k => {
+    const rs = rows.filter(r => keyFn(r) === k);
+    const cnt = st => rs.filter(r => r.status === st).length;
+    return { k, n: rs.length, overdue: cnt('overdue'), planned: cnt('planned'), total: rs.reduce((a, r) => a + r.total, 0) };
+  }).filter(g => g.n > 0).sort((a, b) => b.total - a.total);
+  const sum = f => groups.reduce((a, g) => a + g[f], 0);
+  const n = v => v ? nf.format(v) : '<span class="muted">0</span>';
+  document.getElementById(id).innerHTML = `
+    <thead><tr><th>${title}</th><th class="r">Anzahl</th><th class="r">Überfällig</th><th class="r">Geplant</th><th class="r">Prognose</th></tr></thead>
+    <tbody>${groups.map(g => `<tr>
+      <td class="strong">${esc(g.k)}</td>
+      <td class="r num">${g.n}</td>
+      <td class="r num ${g.overdue ? 'bad' : ''}">${n(g.overdue)}</td>
+      <td class="r num ${g.planned ? 'good' : ''}">${n(g.planned)}</td>
+      <td class="r num strong">${eur(g.total)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Gesamt</td><td class="r num">${sum('n')}</td><td class="r num">${sum('overdue')}</td><td class="r num">${sum('planned')}</td><td class="r num">${eur(sum('total'))}</td></tr></tfoot>`;
+}
+
+function renderOverview(t) {
+  groupTable('bySite', 'Standort', t.rows, r => r.site, ['Nord', 'Ost', 'Süd']);
+  groupTable('byType', 'Kategorie', t.rows, r => r.type, [...new Set(Object.values(TYPES).map(x => x.kind))]);
+}
+
 function renderPanel() {
   const panel = document.getElementById('panel'), scrim = document.getElementById('scrim');
   const open = state.openId != null;
@@ -414,7 +452,7 @@ function renderPanel() {
 
 function render() {
   const t = fleetTotals();
-  renderScenario(); renderKpis(t); renderTable(t); renderSites(t); renderPanel();
+  renderScenario(); renderKpis(t); renderTable(t); renderOverview(t); renderSites(t); renderPanel();
 }
 
 // ---------- Events ----------
