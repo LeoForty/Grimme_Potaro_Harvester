@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wartungsbudget Flotte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAF9; --surface: #FFFFFF; --line: #E7E5E4; --ink: #1C1917;
+    --muted: #78716C; --bad: #DC2626; --good: #16A34A; --fill: #F5F5F4;
+    /* Brand tokens. PROVISIONAL: replace with official GRIMME values from the brand guide. */
+    --brand: #C8102E;        /* GRIMME red: logo, active nav, primary button only */
+    --chart-1: #3A3A3A;      /* graphite: planned service */
+    --chart-2: #C9C9C9;      /* light grey: emergency reserve */
+    --chart-bg: #F2F2F2;     /* off-season band */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 400 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, p, dl, dd { margin: 0; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .bad { color: var(--bad); }
+  .good { color: var(--good); }
+  .label { font-size: 12px; color: var(--muted); }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 40px 32px; }
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .topbar h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar .label { margin-top: 4px; }
+  .scenario { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  .seg { display: inline-flex; background: var(--fill); border-radius: 8px; padding: 2px; }
+  .seg button { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line), inset 0 -2px 0 var(--brand); }
+  .seg.months { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; margin-bottom: 12px; }
+  .seg.months button { padding: 6px 0; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  section { margin-top: 40px; }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .section-head h2 { font-size: 14px; font-weight: 600; }
+
+  .kpis { display: grid; gap: 1px; background: var(--line); }
+  .kpis.c3, .kpis.c4 { display: none; }
+  .kpi { background: var(--surface); padding: 20px 24px; }
+  .kpi .value { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  table { width: 100%; border-collapse: collapse; text-align: left; }
+  thead th { font-size: 12px; font-weight: 500; color: var(--muted); padding: 12px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  thead th button { display: inline-flex; align-items: center; gap: 4px; }
+  thead th button:hover, thead th button.active { color: var(--ink); }
+  .arrow { display: inline-block; width: 12px; }
+  .fleet tbody td { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .fleet tbody tr:last-child td { border-bottom: 0; }
+  .fleet tbody tr { cursor: pointer; }
+  .fleet tbody tr:hover, .fleet tbody tr.selected { background: var(--bg); }
+  .r { text-align: right; }
+  .strong { font-weight: 500; }
+
+  .status { display: inline-flex; align-items: center; gap: 8px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+  .dot.bad { background: var(--bad); }
+  .dot.good { background: var(--good); }
+
+  .sites { padding: 20px 24px; display: grid; gap: 16px; }
+  .site { display: grid; grid-template-columns: 120px 1fr 140px; gap: 24px; align-items: center; }
+  .site .name { font-weight: 500; }
+  .site .total { text-align: right; font-weight: 600; font-size: 16px; }
+  .bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--fill); }
+  .bar .reg { background: var(--chart-1); }
+  .bar .res { background: var(--chart-2); }
+  .bar + .label { margin-top: 6px; }
+  .legend { display: flex; gap: 20px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+  .scrim { position: fixed; inset: 0; background: rgba(28, 25, 23, 0.08); transition: opacity 220ms; }
+  .panel {
+    position: fixed; top: 0; right: 0; height: 100%; width: 400px; overflow-y: auto;
+    background: var(--surface); border-left: 1px solid var(--line);
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
+  }
+  .closed.scrim { opacity: 0; pointer-events: none; }
+  .closed.panel { transform: translateX(100%); visibility: hidden; transition: transform 220ms cubic-bezier(.2, .8, .2, 1), visibility 0s 220ms; }
+  .block { padding: 20px 24px; border-bottom: 1px solid var(--line); }
+  .block:last-child { border-bottom: 0; }
+  .block > .label:first-child { margin-bottom: 8px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .panel-head .title { font-size: 16px; font-weight: 600; }
+  .panel-head .status { margin-top: 8px; font-size: 13px; }
+  .close { width: 32px; height: 32px; margin-right: -8px; border-radius: 6px; font-size: 20px; line-height: 1; color: var(--muted); }
+  .close:hover { color: var(--ink); background: var(--bg); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .compare .value { font-size: 24px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .split div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .split .sum { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 7px; font-weight: 600; }
+  .btn { display: block; width: 100%; height: 36px; border-radius: 8px; font-weight: 500; border: 1px solid var(--line); }
+  .btn:hover { background: var(--bg); }
+  .btn + .btn { margin-top: 8px; }
+  .btn.primary { background: var(--brand); color: #FFFFFF; border-color: var(--brand); }
+  .btn.primary:hover { filter: brightness(0.92); }
+  .btn:disabled { color: var(--muted); cursor: default; background: none; }
+  .note { margin-bottom: 12px; }
+  .overview { display: grid; grid-template-columns: 5fr 7fr; gap: 24px; align-items: start; }
+  .overview td, .overview th { white-space: nowrap; }
+  .overview th { padding: 12px 16px; }
+  .overview td { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .overview tbody tr:last-child td { border-bottom: 0; }
+  .overview tfoot td { padding: 10px 16px; border-top: 1px solid var(--line); font-weight: 600; }
+  .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .side { border-right: 1px solid var(--line); background: var(--surface); padding: 24px 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 28px; }
+  .logo { display: flex; align-items: center; height: 32px; padding: 0 8px; }
+  .logo img { height: 22px; }
+  .logo .word { font-weight: 700; letter-spacing: 0.08em; font-size: 18px; color: var(--brand); }
+  .side { border-top: 3px solid var(--brand); }
+  .nav a.active { color: var(--ink); background: var(--bg); box-shadow: inset 2px 0 0 var(--brand); }
+  .nav { display: grid; gap: 2px; }
+  .nav a { display: block; padding: 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-weight: 500; }
+  .nav a:hover { background: var(--bg); color: var(--ink); }
+  .side .foot { margin-top: auto; padding: 0 8px; }
+  .page { padding: 32px 40px; }
+  .dash { display: grid; grid-template-columns: 280px 1fr; gap: 16px; margin-top: 32px; }
+  .stack { display: grid; gap: 16px; }
+  .stack .kpi { border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  .stack .kpi .value { font-size: 28px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 16px; margin-top: 16px; }
+  .tile { padding: 20px 24px; }
+  .tile-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .tile-head h2 { font-size: 14px; font-weight: 600; }
+  svg text { font: 500 11px Inter, system-ui, sans-serif; fill: var(--muted); }
+  .donut { display: flex; align-items: center; gap: 20px; }
+  .risk li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .risk li:first-child { border-top: 0; padding-top: 0; }
+  .risk li:hover .strong { text-decoration: underline; }
+  .risk { list-style: none; margin: 0; padding: 0; }
+  .history th { padding: 6px 0; border-bottom: 0; }
+  .history td { padding: 8px 0; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+<nav class="side" aria-label="Navigation">
+  <div class="logo"><img src="grimme-logo.svg" alt="GRIMME" onerror="this.outerHTML='<span class=&quot;word&quot;>GRIMME</span>'"></div>
+  <div class="nav">
+    <a href="#top" class="active">Dashboard</a>
+    <a href="#maschinen">Maschinen</a>
+    <a href="#uebersicht">Übersicht</a>
+    <a href="#standorte">Standorte</a>
+  </div>
+  <div class="foot label">Beispieldaten · Stand 2026</div>
+</nav>
+<main class="page" id="top">
+  <div class="topbar">
+    <div>
+      <h1>Wartungsbudget Flotte</h1>
+      <p class="label">Nächste 12 Monate · Beispieldaten</p>
+    </div>
+    <div class="scenario">
+      <span class="label">Preisszenario</span>
+      <div class="seg" role="group" aria-label="Preisszenario" id="scenario"></div>
+    </div>
+  </div>
+
+  <div class="dash">
+    <div class="stack" id="kpiStack"></div>
+    <div class="card tile">
+      <div class="tile-head"><h2>Kosten pro Monat</h2><span class="label" id="monthLegend"></span></div>
+      <div id="monthChart"></div>
+    </div>
+  </div>
+
+  <div class="row3">
+    <div class="card tile">
+      <div class="tile-head"><h2>Planbarer Anteil</h2></div>
+      <div class="donut" id="donut"></div>
+    </div>
+    <div class="card tile">
+      <div class="tile-head"><h2>Höchstes Risiko</h2><span class="label">Notfall-Reserve</span></div>
+      <ul class="risk" id="risk"></ul>
+    </div>
+    <div class="card tile">
+      <div class="tile-head"><h2>Szenarien</h2><span class="label">Gesamt 12 Monate</span></div>
+      <div id="scnChart"></div>
+    </div>
+  </div>
+  <div id="kpis" hidden></div>
+
+  <section id="maschinen">
+    <div class="section-head">
+      <h2>Maschinen</h2>
+      <span class="label" id="count"></span>
+    </div>
+    <div class="card">
+      <table class="fleet">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="uebersicht">
+    <div class="section-head"><h2>Übersicht</h2><span class="label">Szenario folgt Auswahl</span></div>
+    <div class="overview">
+      <div class="card"><table id="bySite"></table></div>
+      <div class="card"><table id="byType"></table></div>
+    </div>
+  </section>
+
+  <section id="standorte">
+    <div class="section-head"><h2>Budget nach Standort</h2></div>
+    <div class="card sites" id="sites"></div>
+  </section>
+</main>
+</div>
+
+<div id="scrim" class="scrim closed"></div>
+<aside id="panel" class="panel closed" aria-hidden="true" aria-label="Maschinendetails">
+  <div id="panelBody"></div>
+</aside>
+
+<script>
+// ---------- Data + logic ----------
+const CURRENT_YEAR = 2026;
+
+const SCENARIOS = {
+  niedrig: { label: 'Niedrig', parts: 0.03, labour: 0.02 },
+  basis:   { label: 'Basis',   parts: 0.07, labour: 0.05 },
+  hoch:    { label: 'Hoch',    parts: 0.12, labour: 0.09 }
+};
+
+const TYPES = {
+  'Varitron 470': { kind: 'Kartoffelroder, selbstfahrend', base: 14000 },
+  'Rexor 6300':   { kind: 'Rübenroder',                    base: 16000 },
+  'SE 260':       { kind: 'Kartoffelroder, gezogen',       base: 7000 },
+  'GL 430':       { kind: 'Legemaschine',                  base: 3500 },
+  'BF 400':       { kind: 'Dammformer',                    base: 3000 },
+  'KS 5400':      { kind: 'Krautschläger',                 base: 2000 }
+};
+
+const P = 'planned', E = 'emergency';
+const FLEET = [
+  { id: 1,  model: 'Varitron 470', nr: 1, site: 'Nord', yearBuilt: 2019, hoursSinceService: 420, history: [['2025-01-14',P,12800],['2025-08-29',E,21400],['2024-02-02',P,11900]] },
+  { id: 2,  model: 'Varitron 470', nr: 2, site: 'Ost',  yearBuilt: 2015, hoursSinceService: 180, history: [['2025-12-10',P,15200],['2024-12-05',P,14100]] },
+  { id: 3,  model: 'Varitron 470', nr: 3, site: 'Süd',  yearBuilt: 2022, hoursSinceService: 95,  history: [['2026-02-18',P,9800],['2025-02-11',P,9400]] },
+  { id: 4,  model: 'Rexor 6300',   nr: 1, site: 'Nord', yearBuilt: 2013, hoursSinceService: 510, history: [['2024-11-20',P,17900],['2025-10-07',E,31200],['2026-10-15',E,18600],['2023-12-12',P,16400]] },
+  { id: 5,  model: 'Rexor 6300',   nr: 2, site: 'Süd',  yearBuilt: 2020, hoursSinceService: 240, history: [['2026-01-22',P,13700],['2025-01-16',P,13100]] },
+  { id: 6,  model: 'SE 260',       nr: 1, site: 'Ost',  yearBuilt: 2012, hoursSinceService: 380, history: [['2025-03-03',P,8900],['2025-09-18',E,14300],['2024-02-27',P,8200]] },
+  { id: 7,  model: 'SE 260',       nr: 2, site: 'Nord', yearBuilt: 2017, hoursSinceService: 150, history: [['2026-02-05',P,7600],['2025-02-07',P,7300]] },
+  { id: 8,  model: 'SE 260',       nr: 3, site: 'Süd',  yearBuilt: 2024, hoursSinceService: 60,  history: [['2026-03-12',P,4100],['2025-03-20',P,3900]] },
+  { id: 9,  model: 'GL 430',       nr: 1, site: 'Nord', yearBuilt: 2016, hoursSinceService: 120, history: [['2026-01-08',P,4300],['2025-01-09',P,4000],['2024-05-04',E,6100]] },
+  { id: 10, model: 'GL 430',       nr: 2, site: 'Ost',  yearBuilt: 2021, hoursSinceService: 340, history: [['2025-02-25',P,3300],['2026-04-28',E,5800]] },
+  { id: 11, model: 'BF 400',       nr: 1, site: 'Süd',  yearBuilt: 2014, hoursSinceService: 210, history: [['2025-12-02',P,4200],['2024-12-03',P,3900]] },
+  { id: 12, model: 'BF 400',       nr: 2, site: 'Ost',  yearBuilt: 2018, hoursSinceService: 90,  history: [['2026-02-26',P,3400],['2025-03-04',P,3200]] },
+  { id: 13, model: 'KS 5400',      nr: 1, site: 'Nord', yearBuilt: 2023, hoursSinceService: 40,  history: [['2026-03-02',P,1500],['2025-03-06',P,1400]] },
+  { id: 14, model: 'KS 5400',      nr: 2, site: 'Süd',  yearBuilt: 2013, hoursSinceService: 330, history: [['2025-01-28',P,2600],['2025-09-02',E,4100],['2024-01-30',P,2400]] },
+  { id: 15, model: 'Rexor 6300',   nr: 3, site: 'Ost',  yearBuilt: 2025, hoursSinceService: 30,  history: [['2026-09-01',P,6200],['2026-03-15',P,5900]] }
+].map(m => ({
+  ...m,
+  name: `${m.model} #${m.nr}`,
+  type: TYPES[m.model].kind,
+  base: TYPES[m.model].base,
+  age: CURRENT_YEAR - m.yearBuilt,
+  history: m.history.map(([date, kind, cost]) => ({ date, kind, cost })).sort((a, b) => b.date.localeCompare(a.date))
+}));
+
+const SERVICE_MONTHS = ['Dezember', 'Januar', 'Februar', 'März'];
+
+const state = {
+  scenario: 'basis',
+  plans: {},            // id -> month
+  sort: { key: 'status', dir: 1 },
+  openId: null,
+  pickMonth: 'Januar',
+  partnerSent: {}
+};
+
+const priceFactor = s => 1 + 0.6 * SCENARIOS[s].parts + 0.4 * SCENARIOS[s].labour;
+const isOverdue = m => m.hoursSinceService > 300;
+
+function forecast(m, scenario, planned) {
+  const pf = priceFactor(scenario);
+  const regular = m.base * (1 + 0.07 * m.age) * pf;
+  const chance = planned ? 0.05 : (isOverdue(m) ? 0.35 : 0.10);
+  const reserve = chance * m.base * 2 * pf;
+  return { regular, reserve, chance, total: regular + reserve };
+}
+
+function machineView(m, scenario = state.scenario) {
+  const planned = !!state.plans[m.id];
+  const now = forecast(m, scenario, planned);
+  const before = forecast(m, scenario, false);
+  const status = planned ? 'planned' : (isOverdue(m) ? 'overdue' : 'normal');
+  return { ...m, ...now, status, saving: before.reserve - now.reserve, without: before, withPlan: forecast(m, scenario, true) };
+}
+
+function fleetTotals(scenario = state.scenario) {
+  const rows = FLEET.map(m => machineView(m, scenario));
+  const sum = k => rows.reduce((a, r) => a + r[k], 0);
+  return { rows, total: sum('total'), regular: sum('regular'), reserve: sum('reserve'), saving: sum('saving') };
+}
+
+// Batch 1 check
+for (const s of Object.keys(SCENARIOS)) console.log(`Flotte gesamt (${SCENARIOS[s].label}):`, Math.round(fleetTotals(s).total));
+
+// ---------- Formatting ----------
+const nf = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+const eur = v => `${nf.format(Math.round(v))} €`;
+const pct = v => `${nf.format(Math.round(v * 100))} %`;
+const date = iso => { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const STATUS = {
+  overdue: { label: 'Überfällig', cls: 'bad',   dot: 'bad' },
+  normal:  { label: 'Normal',     cls: 'muted', dot: '' },
+  planned: { label: 'Geplant',    cls: 'good',  dot: 'good' }
+};
+const STATUS_RANK = { overdue: 0, normal: 1, planned: 2 };
+
+const statusTag = (r, suffix = '') => {
+  const s = STATUS[r.status];
+  const month = r.status === 'planned' ? ` · ${state.plans[r.id]}` : '';
+  return `<span class="status ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}${month}${suffix}</span>`;
+};
+
+// ---------- Render ----------
+function renderScenario() {
+  document.getElementById('scenario').innerHTML = Object.entries(SCENARIOS).map(([k, s]) =>
+    `<button data-scn="${k}" aria-pressed="${state.scenario === k}">${s.label}</button>`
+  ).join('');
+}
+
+const kpi = (label, value, cls = '') =>
+  `<div class="kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
+
+function renderKpis(t) {
+  const hasPlan = Object.keys(state.plans).length > 0;
+  const el = document.getElementById('kpis');
+  el.className = `card kpis ${hasPlan ? 'c4' : 'c3'}`;
+  el.innerHTML =
+    kpi('Gesamt 12 Monate', eur(t.total)) +
+    kpi('Geplanter Service', eur(t.regular)) +
+    kpi('Notfall-Reserve', eur(t.reserve)) +
+    (hasPlan ? kpi('Eingespart', eur(t.saving), 'good') : '');
+}
+
+const COLS = [
+  { key: 'name', label: 'Maschine' },
+  { key: 'type', label: 'Typ' },
+  { key: 'site', label: 'Standort' },
+  { key: 'age', label: 'Alter', num: true },
+  { key: 'hoursSinceService', label: 'Std. seit Service', num: true },
+  { key: 'total', label: 'Prognose', num: true },
+  { key: 'status', label: 'Status' }
+];
+
+function sortRows(rows) {
+  const { key, dir } = state.sort;
+  return rows.slice().sort((a, b) => {
+    if (key === 'status') {
+      const d = STATUS_RANK[a.status] - STATUS_RANK[b.status];
+      return d !== 0 ? d * dir : b.total - a.total;
+    }
+    // dir 1 = default: numbers high to low, text A to Z
+    const av = a[key], bv = b[key];
+    const d = typeof av === 'number' ? bv - av : String(av).localeCompare(String(bv), 'de');
+    return d * dir;
+  });
+}
+
+function renderTable(t) {
+  document.getElementById('thead').innerHTML = `<tr>${COLS.map(c => {
+    const active = state.sort.key === c.key;
+    const arrow = active ? (state.sort.dir === 1 ? '↓' : '↑') : '';
+    const aria = active ? (state.sort.dir === 1 ? 'descending' : 'ascending') : 'none';
+    return `<th class="${c.num ? 'r' : ''}" aria-sort="${aria}"><button data-sort="${c.key}" class="${active ? 'active' : ''}">${c.label}<span class="arrow">${arrow}</span></button></th>`;
+  }).join('')}</tr>`;
+
+  document.getElementById('tbody').innerHTML = sortRows(t.rows).map(r => `
+    <tr data-id="${r.id}" class="${state.openId === r.id ? 'selected' : ''}">
+      <td class="strong">${esc(r.name)}</td>
+      <td class="muted">${esc(r.type)}</td>
+      <td>${r.site}</td>
+      <td class="r num">${r.age} J.</td>
+      <td class="r num ${r.status === 'overdue' ? 'bad' : ''}">${nf.format(r.hoursSinceService)}</td>
+      <td class="r num strong">${eur(r.total)}</td>
+      <td>${statusTag(r)}</td>
+    </tr>`).join('');
+
+  const overdue = t.rows.filter(r => r.status === 'overdue').length;
+  const planned = t.rows.filter(r => r.status === 'planned').length;
+  document.getElementById('count').textContent = `${t.rows.length} Maschinen · ${overdue} überfällig · ${planned} geplant`;
+}
+
+function renderSites(t) {
+  const sites = ['Nord', 'Ost', 'Süd'].map(site => {
+    const rs = t.rows.filter(r => r.site === site);
+    const sum = k => rs.reduce((a, r) => a + r[k], 0);
+    return { site, n: rs.length, total: sum('total'), regular: sum('regular'), reserve: sum('reserve') };
+  });
+  const max = Math.max(...sites.map(s => s.total));
+  document.getElementById('sites').innerHTML = sites.map(s => `
+    <div class="site">
+      <div><div class="name">${s.site}</div><div class="label">${s.n} Maschinen</div></div>
+      <div>
+        <div class="bar" style="width:${(s.total / max * 100).toFixed(1)}%">
+          <div class="reg" style="width:${(s.regular / s.total * 100).toFixed(1)}%"></div>
+          <div class="res" style="width:${(s.reserve / s.total * 100).toFixed(1)}%"></div>
+        </div>
+        <div class="label num">Service ${eur(s.regular)} · Reserve ${eur(s.reserve)}</div>
+      </div>
+      <div class="total num">${eur(s.total)}</div>
+    </div>`).join('') + `
+    <div class="legend label">
+      <span><span class="swatch" style="background:var(--chart-1)"></span>Geplanter Service</span>
+      <span><span class="swatch" style="background:var(--chart-2)"></span>Notfall-Reserve</span>
+    </div>`;
+}
+
+function groupTable(id, title, rows, keyFn, keys) {
+  const groups = keys.map(k => {
+    const rs = rows.filter(r => keyFn(r) === k);
+    const cnt = st => rs.filter(r => r.status === st).length;
+    return { k, n: rs.length, overdue: cnt('overdue'), planned: cnt('planned'), total: rs.reduce((a, r) => a + r.total, 0) };
+  }).filter(g => g.n > 0).sort((a, b) => b.total - a.total);
+  const sum = f => groups.reduce((a, g) => a + g[f], 0);
+  const n = v => v ? nf.format(v) : '<span class="muted">0</span>';
+  document.getElementById(id).innerHTML = `
+    <thead><tr><th>${title}</th><th class="r">Anzahl</th><th class="r">Überfällig</th><th class="r">Geplant</th><th class="r">Prognose</th></tr></thead>
+    <tbody>${groups.map(g => `<tr>
+      <td class="strong">${esc(g.k)}</td>
+      <td class="r num">${g.n}</td>
+      <td class="r num ${g.overdue ? 'bad' : ''}">${n(g.overdue)}</td>
+      <td class="r num ${g.planned ? 'good' : ''}">${n(g.planned)}</td>
+      <td class="r num strong">${eur(g.total)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Gesamt</td><td class="r num">${sum('n')}</td><td class="r num">${sum('overdue')}</td><td class="r num">${sum('planned')}</td><td class="r num">${eur(sum('total'))}</td></tr></tfoot>`;
+}
+
+function renderOverview(t) {
+  groupTable('bySite', 'Standort', t.rows, r => r.site, ['Nord', 'Ost', 'Süd']);
+  groupTable('byType', 'Kategorie', t.rows, r => r.type, [...new Set(Object.values(TYPES).map(x => x.kind))]);
+}
+
+const MONTHS = ['Nov','Dez','Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt'];
+const MONTH_IDX = { Dezember: 1, Januar: 2, Februar: 3, 'März': 4 };
+// Cash-out per month: regular service lands in its planned month (default Feb for normal,
+// in harvest Aug-Oct for overdue machines nobody planned); reserve spread over harvest Aug-Oct.
+function monthly(t) {
+  const reg = Array(12).fill(0), res = Array(12).fill(0);
+  for (const r of t.rows) {
+    if (r.status === 'planned') reg[MONTH_IDX[state.plans[r.id]]] += r.regular;
+    else if (r.status === 'overdue') [9, 10, 11].forEach(i => reg[i] += r.regular / 3);
+    else reg[3] += r.regular;
+    [9, 10, 11].forEach(i => res[i] += r.reserve / 3);
+  }
+  return { reg, res };
+}
+
+function renderMonthChart(t) {
+  const { reg, res } = monthly(t);
+  const W = 760, H = 330, pl = 44, pb = 24, pt = 8, bw = (W - pl) / 12;
+  const max = Math.max(...reg.map((v, i) => v + res[i])) * 1.1;
+  const y = v => pt + (H - pt - pb) * (1 - v / max);
+  const ticks = [0, 0.5, 1].map(f => max / 1.1 * f);
+  let g = ticks.map(v => `<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#E7E5E4"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${nf.format(Math.round(v / 1000))}k</text>`).join('');
+  g += `<rect x="${pl + bw}" y="${pt}" width="${bw * 4}" height="${H - pt - pb}" fill="var(--chart-bg)"/><text x="${pl + bw * 3}" y="${pt + 14}" text-anchor="middle">Nebensaison</text>`;
+  g += reg.map((v, i) => {
+    const x = pl + i * bw + bw * 0.22, w = bw * 0.56;
+    return `<rect x="${x}" y="${y(v)}" width="${w}" height="${y(0) - y(v)}" fill="var(--chart-1)" rx="2"><title>${MONTHS[i]}: Service ${eur(v)}</title></rect>` +
+      (res[i] ? `<rect x="${x}" y="${y(v + res[i])}" width="${w}" height="${y(v) - y(v + res[i])}" fill="var(--chart-2)" rx="2"><title>${MONTHS[i]}: Reserve ${eur(res[i])}</title></rect>` : '') +
+      `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${MONTHS[i]}</text>`;
+  }).join('');
+  document.getElementById('monthChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Kosten pro Monat">${g}</svg>`;
+  document.getElementById('monthLegend').innerHTML = `<span class="legend"><span><span class="swatch" style="background:var(--chart-1)"></span>Service</span><span><span class="swatch" style="background:var(--chart-2)"></span>Reserve</span></span>`;
+}
+
+function renderKpiStack(t) {
+  const hasPlan = Object.keys(state.plans).length > 0;
+  document.getElementById('kpiStack').innerHTML =
+    kpi('Gesamt 12 Monate', eur(t.total)) +
+    kpi('Geplanter Service', eur(t.regular)) +
+    kpi('Notfall-Reserve', eur(t.reserve)) +
+    (hasPlan ? kpi('Eingespart', eur(t.saving), 'good') : '');
+}
+
+function renderDonut(t) {
+  const share = t.regular / t.total, R = 52, C = 2 * Math.PI * R;
+  document.getElementById('donut').innerHTML = `
+    <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label="Planbarer Anteil">
+      <circle cx="66" cy="66" r="${R}" fill="none" stroke="#E7E5E4" stroke-width="12"/>
+      <circle cx="66" cy="66" r="${R}" fill="none" stroke="var(--chart-1)" stroke-width="12" stroke-dasharray="${C * share} ${C}" transform="rotate(-90 66 66)"/>
+      <text x="66" y="72" text-anchor="middle" style="font-size:20px;font-weight:600;fill:#1C1917">${pct(share)}</text>
+    </svg>
+    <dl class="split num" style="flex:1">
+      <div><dt class="muted">Service</dt><dd>${eur(t.regular)}</dd></div>
+      <div><dt class="muted">Reserve</dt><dd>${eur(t.reserve)}</dd></div>
+    </dl>`;
+}
+
+function renderRisk(t) {
+  const top = t.rows.filter(r => r.status !== 'planned').sort((a, b) => b.reserve - a.reserve).slice(0, 5);
+  document.getElementById('risk').innerHTML = top.map(r => `
+    <li data-risk="${r.id}"><span><span class="strong">${esc(r.name)}</span><br><span class="label">${r.site} · ${nf.format(r.hoursSinceService)} Std.</span></span>
+    <span class="num ${r.status === 'overdue' ? 'bad' : ''}">${eur(r.reserve)}</span></li>`).join('');
+}
+
+function renderScenarioChart() {
+  const vals = Object.keys(SCENARIOS).map(k => ({ k, v: fleetTotals(k).total }));
+  const W = 300, H = 150, max = Math.max(...vals.map(x => x.v)), min = Math.min(...vals.map(x => x.v)) * 0.9;
+  const bw = W / 3;
+  document.getElementById('scnChart').innerHTML = `<svg viewBox="0 0 ${W} ${H + 56}" width="100%" role="img" aria-label="Szenarien"><g transform="translate(0 20)">${vals.map((x, i) => {
+    const h = H * (x.v - min) / (max - min) * 0.75 + H * 0.2, cur = x.k === state.scenario;
+    return `<rect x="${i * bw + bw * 0.25}" y="${H - h}" width="${bw * 0.5}" height="${h}" rx="3" fill="${cur ? 'var(--chart-1)' : 'var(--chart-2)'}"/>
+      <text x="${i * bw + bw / 2}" y="${H - h - 6}" text-anchor="middle" style="${cur ? 'fill:#1C1917' : ''}">${nf.format(Math.round(x.v / 1000))}k €</text>
+      <text x="${i * bw + bw / 2}" y="${H + 18}" text-anchor="middle" style="${cur ? 'fill:#1C1917;font-weight:600' : ''}">${SCENARIOS[x.k].label}</text>`;
+  }).join('')}</g></svg>`;
+}
+
+function renderPanel() {
+  const panel = document.getElementById('panel'), scrim = document.getElementById('scrim');
+  const open = state.openId != null;
+  panel.classList.toggle('closed', !open);
+  scrim.classList.toggle('closed', !open);
+  panel.setAttribute('aria-hidden', String(!open));
+  if (!open) return;
+
+  const m = machineView(FLEET.find(x => x.id === state.openId));
+  const planned = m.status === 'planned';
+  const sent = state.partnerSent[m.id];
+
+  document.getElementById('panelBody').innerHTML = `
+  <div class="block panel-head">
+    <div>
+      <div class="title">${esc(m.name)}</div>
+      <div class="label">${esc(m.type)} · ${m.site} · Baujahr ${m.yearBuilt}</div>
+      ${statusTag(m, ` · ${nf.format(m.hoursSinceService)} Std.`)}
+    </div>
+    <button data-close class="close" aria-label="Schließen">×</button>
+  </div>
+
+  <div class="block compare">
+    <div><div class="label">Ohne Planung</div><div class="value ${planned ? 'muted' : ''}">${eur(m.without.total)}</div></div>
+    <div><div class="label">Mit Planung</div><div class="value ${planned ? 'good' : ''}">${eur(m.withPlan.total)}</div></div>
+  </div>
+
+  <div class="block">
+    <div class="label">Kostenaufteilung</div>
+    <dl class="split num">
+      <div><dt>Regulärer Service</dt><dd>${eur(m.regular)}</dd></div>
+      <div><dt>Notfall-Reserve <span class="muted">(${pct(m.chance)})</span></dt><dd>${eur(m.reserve)}</dd></div>
+      <div class="sum"><dt>Prognose</dt><dd>${eur(m.total)}</dd></div>
+    </dl>
+  </div>
+
+  <div class="block">
+    <div class="label">Service planen</div>
+    ${planned ? `
+      <p class="note">Geplant im ${state.plans[m.id]}. Reserve sinkt um <span class="num strong good">${eur(m.saving)}</span>.</p>
+      <button data-unplan class="btn">Planung entfernen</button>
+    ` : `
+      <div class="seg months" role="group" aria-label="Monat">
+        ${SERVICE_MONTHS.map(mo => `<button data-month="${mo}" aria-pressed="${state.pickMonth === mo}">${mo.slice(0, 3)}</button>`).join('')}
+      </div>
+      <button data-plan class="btn primary">Service planen</button>
+    `}
+    <button data-partner class="btn" ${sent ? 'disabled' : ''}>${sent ? 'Anfrage gesendet (Demo)' : 'Mit GRIMME-Partner buchen'}</button>
+  </div>
+
+  <div class="block">
+    <div class="label">Servicehistorie</div>
+    <table class="history">
+      <thead><tr><th>Datum</th><th>Art</th><th class="r">Kosten</th></tr></thead>
+      <tbody>${m.history.map(h => `<tr>
+        <td class="num">${date(h.date)}</td>
+        <td class="${h.kind === 'emergency' ? 'bad' : ''}">${h.kind === 'emergency' ? 'Notfall' : 'Geplant'}</td>
+        <td class="r num">${eur(h.cost)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function render() {
+  const t = fleetTotals();
+  renderScenario(); renderKpis(t); renderKpiStack(t); renderMonthChart(t); renderDonut(t); renderRisk(t); renderScenarioChart(); renderTable(t); renderOverview(t); renderSites(t); renderPanel();
+}
+
+// ---------- Events ----------
+document.addEventListener('click', e => {
+  const b = e.target.closest('button, tr[data-id], li[data-risk], #scrim');
+  if (!b) return;
+  if (b.dataset.scn) state.scenario = b.dataset.scn;
+  else if (b.dataset.sort) {
+    const k = b.dataset.sort;
+    state.sort = state.sort.key === k ? { key: k, dir: -state.sort.dir } : { key: k, dir: 1 };
+  }
+  else if (b.dataset.risk) { state.openId = +b.dataset.risk; state.pickMonth = 'Januar'; }
+  else if (b.dataset.id) { state.openId = +b.dataset.id; state.pickMonth = 'Januar'; }
+  else if (b.id === 'scrim' || 'close' in b.dataset) state.openId = null;
+  else if (b.dataset.month) state.pickMonth = b.dataset.month;
+  else if ('plan' in b.dataset) state.plans[state.openId] = state.pickMonth;
+  else if ('unplan' in b.dataset) delete state.plans[state.openId];
+  else if ('partner' in b.dataset) state.partnerSent[state.openId] = true;
+  else return;
+  render();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.openId != null) { state.openId = null; render(); }
+});
+
+render();
+</script>
+</body>
+</html>
