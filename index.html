@@ -5,77 +5,150 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wartungsbudget Flotte</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com/3.4.16"></script>
-<script>
-  if (window.tailwind) tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-        colors: {
-          bg: '#FAFAF9', surface: '#FFFFFF', line: '#E7E5E4',
-          ink: '#1C1917', muted: '#78716C', bad: '#DC2626', good: '#16A34A'
-        }
-      }
-    }
-  };
-</script>
 <style>
-  body { font-size: 14px; font-feature-settings: "cv11"; }
+  :root {
+    --bg: #FAFAF9; --surface: #FFFFFF; --line: #E7E5E4; --ink: #1C1917;
+    --muted: #78716C; --bad: #DC2626; --good: #16A34A; --fill: #F5F5F4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 400 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, p, dl, dd { margin: 0; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .num { font-variant-numeric: tabular-nums; }
-  .seg button[aria-pressed="true"] { background: #FFFFFF; color: #1C1917; box-shadow: 0 0 0 1px #E7E5E4; }
-  #panel { transition: transform 220ms cubic-bezier(.2,.8,.2,1); }
-  #panel.closed { transform: translateX(100%); }
-  #scrim { transition: opacity 220ms; }
-  #scrim.closed { opacity: 0; pointer-events: none; }
-  th button:focus-visible, button:focus-visible { outline: 2px solid #1C1917; outline-offset: 2px; }
-  tbody tr { cursor: pointer; }
-  tbody tr:hover { background: #FAFAF9; }
+  .muted { color: var(--muted); }
+  .bad { color: var(--bad); }
+  .good { color: var(--good); }
+  .label { font-size: 12px; color: var(--muted); }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 40px 32px; }
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .topbar h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar .label { margin-top: 4px; }
+  .scenario { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  .seg { display: inline-flex; background: var(--fill); border-radius: 8px; padding: 2px; }
+  .seg button { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+  .seg.months { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; margin-bottom: 12px; }
+  .seg.months button { padding: 6px 0; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  section { margin-top: 40px; }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .section-head h2 { font-size: 14px; font-weight: 600; }
+
+  .kpis { display: grid; gap: 1px; background: var(--line); }
+  .kpis.c3 { grid-template-columns: repeat(3, 1fr); }
+  .kpis.c4 { grid-template-columns: repeat(4, 1fr); }
+  .kpi { background: var(--surface); padding: 20px 24px; }
+  .kpi .value { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  table { width: 100%; border-collapse: collapse; text-align: left; }
+  thead th { font-size: 12px; font-weight: 500; color: var(--muted); padding: 12px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  thead th button { display: inline-flex; align-items: center; gap: 4px; }
+  thead th button:hover, thead th button.active { color: var(--ink); }
+  .arrow { display: inline-block; width: 12px; }
+  .fleet tbody td { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .fleet tbody tr:last-child td { border-bottom: 0; }
+  .fleet tbody tr { cursor: pointer; }
+  .fleet tbody tr:hover, .fleet tbody tr.selected { background: var(--bg); }
+  .r { text-align: right; }
+  .strong { font-weight: 500; }
+
+  .status { display: inline-flex; align-items: center; gap: 8px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+  .dot.bad { background: var(--bad); }
+  .dot.good { background: var(--good); }
+
+  .sites { padding: 20px 24px; display: grid; gap: 16px; }
+  .site { display: grid; grid-template-columns: 120px 1fr 140px; gap: 24px; align-items: center; }
+  .site .name { font-weight: 500; }
+  .site .total { text-align: right; font-weight: 600; font-size: 16px; }
+  .bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--fill); }
+  .bar .reg { background: var(--ink); }
+  .bar .res { background: #D6D3D1; }
+  .bar + .label { margin-top: 6px; }
+  .legend { display: flex; gap: 20px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+  .scrim { position: fixed; inset: 0; background: rgba(28, 25, 23, 0.08); transition: opacity 220ms; }
+  .panel {
+    position: fixed; top: 0; right: 0; height: 100%; width: 400px; overflow-y: auto;
+    background: var(--surface); border-left: 1px solid var(--line);
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
+  }
+  .closed.scrim { opacity: 0; pointer-events: none; }
+  .closed.panel { transform: translateX(100%); visibility: hidden; transition: transform 220ms cubic-bezier(.2, .8, .2, 1), visibility 0s 220ms; }
+  .block { padding: 20px 24px; border-bottom: 1px solid var(--line); }
+  .block:last-child { border-bottom: 0; }
+  .block > .label:first-child { margin-bottom: 8px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .panel-head .title { font-size: 16px; font-weight: 600; }
+  .panel-head .status { margin-top: 8px; font-size: 13px; }
+  .close { width: 32px; height: 32px; margin-right: -8px; border-radius: 6px; font-size: 20px; line-height: 1; color: var(--muted); }
+  .close:hover { color: var(--ink); background: var(--bg); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .compare .value { font-size: 24px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .split div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .split .sum { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 7px; font-weight: 600; }
+  .btn { display: block; width: 100%; height: 36px; border-radius: 8px; font-weight: 500; border: 1px solid var(--line); }
+  .btn:hover { background: var(--bg); }
+  .btn + .btn { margin-top: 8px; }
+  .btn.primary { background: var(--ink); color: #FFFFFF; border-color: var(--ink); }
+  .btn.primary:hover { background: #292524; }
+  .btn:disabled { color: var(--muted); cursor: default; background: none; }
+  .note { margin-bottom: 12px; }
+  .history th { padding: 6px 0; border-bottom: 0; }
+  .history td { padding: 8px 0; border-top: 1px solid var(--line); }
 </style>
 </head>
-<body class="bg-bg text-ink font-sans antialiased">
+<body>
 
-<main class="max-w-[1200px] mx-auto px-8 py-10">
-
-  <!-- Row 1: title + scenario -->
-  <div class="flex items-start justify-between gap-6">
+<main class="page">
+  <div class="topbar">
     <div>
-      <h1 class="text-[20px] font-semibold tracking-tight">Wartungsbudget Flotte</h1>
-      <p class="text-[12px] text-muted mt-1">Nächste 12 Monate · Beispieldaten</p>
+      <h1>Wartungsbudget Flotte</h1>
+      <p class="label">Nächste 12 Monate · Beispieldaten</p>
     </div>
-    <div class="flex flex-col items-end gap-1">
-      <span class="text-[12px] text-muted">Preisszenario</span>
-      <div class="seg inline-flex rounded-lg bg-[#F5F5F4] p-0.5" role="group" aria-label="Preisszenario" id="scenario"></div>
+    <div class="scenario">
+      <span class="label">Preisszenario</span>
+      <div class="seg" role="group" aria-label="Preisszenario" id="scenario"></div>
     </div>
   </div>
 
-  <!-- Row 2: header numbers -->
-  <section class="mt-10 grid grid-cols-4 gap-px bg-line border border-line rounded-xl overflow-hidden" id="kpis"></section>
+  <section class="card kpis c3" id="kpis"></section>
 
-  <!-- Row 3: table -->
-  <section class="mt-10">
-    <div class="flex items-baseline justify-between mb-3">
-      <h2 class="text-[14px] font-semibold">Maschinen</h2>
-      <span class="text-[12px] text-muted" id="count"></span>
+  <section>
+    <div class="section-head">
+      <h2>Maschinen</h2>
+      <span class="label" id="count"></span>
     </div>
-    <div class="bg-surface border border-line rounded-xl overflow-hidden">
-      <table class="w-full text-left">
-        <thead class="text-[12px] text-muted border-b border-line" id="thead"></thead>
+    <div class="card">
+      <table class="fleet">
+        <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
   </section>
 
-  <!-- Row 4: site split -->
-  <section class="mt-10 mb-10">
-    <h2 class="text-[14px] font-semibold mb-3">Budget nach Standort</h2>
-    <div class="bg-surface border border-line rounded-xl px-6 py-5 space-y-4" id="sites"></div>
+  <section>
+    <div class="section-head"><h2>Budget nach Standort</h2></div>
+    <div class="card sites" id="sites"></div>
   </section>
 </main>
 
-<!-- Detail panel -->
-<div id="scrim" class="closed fixed inset-0 bg-[#1C1917]/10"></div>
-<aside id="panel" class="closed fixed top-0 right-0 h-full w-[400px] bg-surface border-l border-line overflow-y-auto" aria-hidden="true">
+<div id="scrim" class="scrim closed"></div>
+<aside id="panel" class="panel closed" aria-hidden="true" aria-label="Maschinendetails">
   <div id="panelBody"></div>
 </aside>
 
@@ -171,35 +244,37 @@ const date = iso => { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const STATUS = {
-  overdue: { label: 'Überfällig', cls: 'text-bad',   dot: 'bg-bad' },
-  normal:  { label: 'Normal',     cls: 'text-muted', dot: 'bg-line' },
-  planned: { label: 'Geplant',    cls: 'text-good',  dot: 'bg-good' }
+  overdue: { label: 'Überfällig', cls: 'bad',   dot: 'bad' },
+  normal:  { label: 'Normal',     cls: 'muted', dot: '' },
+  planned: { label: 'Geplant',    cls: 'good',  dot: 'good' }
 };
 const STATUS_RANK = { overdue: 0, normal: 1, planned: 2 };
+
+const statusTag = (r, suffix = '') => {
+  const s = STATUS[r.status];
+  const month = r.status === 'planned' ? ` · ${state.plans[r.id]}` : '';
+  return `<span class="status ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}${month}${suffix}</span>`;
+};
 
 // ---------- Render ----------
 function renderScenario() {
   document.getElementById('scenario').innerHTML = Object.entries(SCENARIOS).map(([k, s]) =>
-    `<button data-scn="${k}" aria-pressed="${state.scenario === k}" class="px-4 py-1.5 rounded-md text-[13px] font-medium text-muted">${s.label}</button>`
+    `<button data-scn="${k}" aria-pressed="${state.scenario === k}">${s.label}</button>`
   ).join('');
 }
 
-function kpi(label, value, extra = '') {
-  return `<div class="bg-surface px-6 py-5">
-    <div class="text-[12px] text-muted">${label}</div>
-    <div class="num text-[32px] font-semibold tracking-tight mt-1 ${extra}">${value}</div>
-  </div>`;
-}
+const kpi = (label, value, cls = '') =>
+  `<div class="kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
 
 function renderKpis(t) {
   const hasPlan = Object.keys(state.plans).length > 0;
   const el = document.getElementById('kpis');
-  el.className = `mt-10 grid ${hasPlan ? 'grid-cols-4' : 'grid-cols-3'} gap-px bg-line border border-line rounded-xl overflow-hidden`;
+  el.className = `card kpis ${hasPlan ? 'c4' : 'c3'}`;
   el.innerHTML =
     kpi('Gesamt 12 Monate', eur(t.total)) +
     kpi('Geplanter Service', eur(t.regular)) +
     kpi('Notfall-Reserve', eur(t.reserve)) +
-    (hasPlan ? kpi('Eingespart', eur(t.saving), 'text-good') : '');
+    (hasPlan ? kpi('Eingespart', eur(t.saving), 'good') : '');
 }
 
 const COLS = [
@@ -219,8 +294,8 @@ function sortRows(rows) {
       const d = STATUS_RANK[a.status] - STATUS_RANK[b.status];
       return d !== 0 ? d * dir : b.total - a.total;
     }
-    const av = a[key], bv = b[key];
     // dir 1 = default: numbers high to low, text A to Z
+    const av = a[key], bv = b[key];
     const d = typeof av === 'number' ? bv - av : String(av).localeCompare(String(bv), 'de');
     return d * dir;
   });
@@ -230,24 +305,20 @@ function renderTable(t) {
   document.getElementById('thead').innerHTML = `<tr>${COLS.map(c => {
     const active = state.sort.key === c.key;
     const arrow = active ? (state.sort.dir === 1 ? '↓' : '↑') : '';
-    return `<th class="font-medium px-4 py-3 ${c.num ? 'text-right' : ''}" aria-sort="${active ? (state.sort.dir === 1 ? 'descending' : 'ascending') : 'none'}">
-      <button data-sort="${c.key}" class="inline-flex items-center gap-1 hover:text-ink ${active ? 'text-ink' : ''}">${c.label}<span class="w-3 inline-block">${arrow}</span></button></th>`;
+    const aria = active ? (state.sort.dir === 1 ? 'descending' : 'ascending') : 'none';
+    return `<th class="${c.num ? 'r' : ''}" aria-sort="${aria}"><button data-sort="${c.key}" class="${active ? 'active' : ''}">${c.label}<span class="arrow">${arrow}</span></button></th>`;
   }).join('')}</tr>`;
 
-  const rows = sortRows(t.rows);
-  document.getElementById('tbody').innerHTML = rows.map(r => {
-    const s = STATUS[r.status];
-    const sel = state.openId === r.id ? 'bg-bg' : '';
-    return `<tr data-id="${r.id}" class="border-b border-line last:border-0 ${sel}">
-      <td class="px-4 py-3 font-medium">${esc(r.name)}</td>
-      <td class="px-4 py-3 text-muted">${esc(r.type)}</td>
-      <td class="px-4 py-3">${r.site}</td>
-      <td class="px-4 py-3 text-right num">${r.age} J.</td>
-      <td class="px-4 py-3 text-right num ${r.status === 'overdue' ? 'text-bad' : ''}">${nf.format(r.hoursSinceService)}</td>
-      <td class="px-4 py-3 text-right num font-medium">${eur(r.total)}</td>
-      <td class="px-4 py-3"><span class="inline-flex items-center gap-2 ${s.cls}"><span class="w-1.5 h-1.5 rounded-full ${s.dot}"></span>${s.label}${r.status === 'planned' ? ` · ${state.plans[r.id]}` : ''}</span></td>
-    </tr>`;
-  }).join('');
+  document.getElementById('tbody').innerHTML = sortRows(t.rows).map(r => `
+    <tr data-id="${r.id}" class="${state.openId === r.id ? 'selected' : ''}">
+      <td class="strong">${esc(r.name)}</td>
+      <td class="muted">${esc(r.type)}</td>
+      <td>${r.site}</td>
+      <td class="r num">${r.age} J.</td>
+      <td class="r num ${r.status === 'overdue' ? 'bad' : ''}">${nf.format(r.hoursSinceService)}</td>
+      <td class="r num strong">${eur(r.total)}</td>
+      <td>${statusTag(r)}</td>
+    </tr>`).join('');
 
   const overdue = t.rows.filter(r => r.status === 'overdue').length;
   const planned = t.rows.filter(r => r.status === 'planned').length;
@@ -262,90 +333,81 @@ function renderSites(t) {
   });
   const max = Math.max(...sites.map(s => s.total));
   document.getElementById('sites').innerHTML = sites.map(s => `
-    <div class="grid grid-cols-[120px_1fr_140px] items-center gap-6">
-      <div><div class="font-medium">${s.site}</div><div class="text-[12px] text-muted">${s.n} Maschinen</div></div>
+    <div class="site">
+      <div><div class="name">${s.site}</div><div class="label">${s.n} Maschinen</div></div>
       <div>
-        <div class="flex h-2 rounded-full overflow-hidden bg-[#F5F5F4]" style="width:${(s.total / max * 100).toFixed(1)}%">
-          <div class="bg-ink" style="width:${(s.regular / s.total * 100).toFixed(1)}%"></div>
-          <div class="bg-muted/40" style="width:${(s.reserve / s.total * 100).toFixed(1)}%"></div>
+        <div class="bar" style="width:${(s.total / max * 100).toFixed(1)}%">
+          <div class="reg" style="width:${(s.regular / s.total * 100).toFixed(1)}%"></div>
+          <div class="res" style="width:${(s.reserve / s.total * 100).toFixed(1)}%"></div>
         </div>
-        <div class="text-[12px] text-muted mt-1.5 num">Service ${eur(s.regular)} · Reserve ${eur(s.reserve)}</div>
+        <div class="label num">Service ${eur(s.regular)} · Reserve ${eur(s.reserve)}</div>
       </div>
-      <div class="text-right num font-semibold text-[16px]">${eur(s.total)}</div>
-    </div>`).join('') +
-    `<div class="flex gap-5 text-[12px] text-muted pt-1">
-      <span class="inline-flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-ink"></span>Geplanter Service</span>
-      <span class="inline-flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-muted/40"></span>Notfall-Reserve</span>
+      <div class="total num">${eur(s.total)}</div>
+    </div>`).join('') + `
+    <div class="legend label">
+      <span><span class="swatch" style="background:var(--ink)"></span>Geplanter Service</span>
+      <span><span class="swatch" style="background:#D6D3D1"></span>Notfall-Reserve</span>
     </div>`;
 }
 
 function renderPanel() {
   const panel = document.getElementById('panel'), scrim = document.getElementById('scrim');
-  if (state.openId == null) {
-    panel.classList.add('closed'); scrim.classList.add('closed'); panel.setAttribute('aria-hidden', 'true');
-    return;
-  }
-  panel.classList.remove('closed'); scrim.classList.remove('closed'); panel.setAttribute('aria-hidden', 'false');
+  const open = state.openId != null;
+  panel.classList.toggle('closed', !open);
+  scrim.classList.toggle('closed', !open);
+  panel.setAttribute('aria-hidden', String(!open));
+  if (!open) return;
 
   const m = machineView(FLEET.find(x => x.id === state.openId));
-  const s = STATUS[m.status];
   const planned = m.status === 'planned';
   const sent = state.partnerSent[m.id];
 
   document.getElementById('panelBody').innerHTML = `
-  <div class="px-6 py-5 border-b border-line flex items-start justify-between">
+  <div class="block panel-head">
     <div>
-      <div class="text-[16px] font-semibold">${esc(m.name)}</div>
-      <div class="text-[12px] text-muted mt-0.5">${esc(m.type)} · ${m.site} · Baujahr ${m.yearBuilt}</div>
-      <div class="mt-2 inline-flex items-center gap-2 text-[13px] ${s.cls}"><span class="w-1.5 h-1.5 rounded-full ${s.dot}"></span>${s.label}${planned ? ` · ${state.plans[m.id]}` : ''} · ${nf.format(m.hoursSinceService)} Std.</div>
+      <div class="title">${esc(m.name)}</div>
+      <div class="label">${esc(m.type)} · ${m.site} · Baujahr ${m.yearBuilt}</div>
+      ${statusTag(m, ` · ${nf.format(m.hoursSinceService)} Std.`)}
     </div>
-    <button data-close class="w-8 h-8 -mr-2 rounded-md text-muted hover:text-ink hover:bg-bg text-[20px] leading-none" aria-label="Schließen">×</button>
+    <button data-close class="close" aria-label="Schließen">×</button>
   </div>
 
-  <div class="px-6 py-5 border-b border-line">
-    <div class="grid grid-cols-2 gap-4">
-      <div>
-        <div class="text-[12px] text-muted">Ohne Planung</div>
-        <div class="num text-[24px] font-semibold mt-0.5 ${planned ? 'text-muted' : ''}">${eur(m.without.total)}</div>
-      </div>
-      <div>
-        <div class="text-[12px] text-muted">Mit Planung</div>
-        <div class="num text-[24px] font-semibold mt-0.5 ${planned ? 'text-good' : ''}">${eur(m.withPlan.total)}</div>
-      </div>
-    </div>
+  <div class="block compare">
+    <div><div class="label">Ohne Planung</div><div class="value ${planned ? 'muted' : ''}">${eur(m.without.total)}</div></div>
+    <div><div class="label">Mit Planung</div><div class="value ${planned ? 'good' : ''}">${eur(m.withPlan.total)}</div></div>
   </div>
 
-  <div class="px-6 py-5 border-b border-line">
-    <div class="text-[12px] text-muted mb-2">Kostenaufteilung</div>
-    <dl class="num space-y-1.5">
-      <div class="flex justify-between"><dt>Regulärer Service</dt><dd>${eur(m.regular)}</dd></div>
-      <div class="flex justify-between"><dt>Notfall-Reserve <span class="text-muted">(${pct(m.chance)})</span></dt><dd>${eur(m.reserve)}</dd></div>
-      <div class="flex justify-between pt-1.5 border-t border-line font-semibold"><dt>Prognose</dt><dd>${eur(m.total)}</dd></div>
+  <div class="block">
+    <div class="label">Kostenaufteilung</div>
+    <dl class="split num">
+      <div><dt>Regulärer Service</dt><dd>${eur(m.regular)}</dd></div>
+      <div><dt>Notfall-Reserve <span class="muted">(${pct(m.chance)})</span></dt><dd>${eur(m.reserve)}</dd></div>
+      <div class="sum"><dt>Prognose</dt><dd>${eur(m.total)}</dd></div>
     </dl>
   </div>
 
-  <div class="px-6 py-5 border-b border-line">
-    <div class="text-[12px] text-muted mb-2">Service planen</div>
+  <div class="block">
+    <div class="label">Service planen</div>
     ${planned ? `
-      <p class="mb-3">Geplant im ${state.plans[m.id]}. Reserve sinkt um <span class="num font-medium text-good">${eur(m.saving)}</span>.</p>
-      <button data-unplan class="w-full h-9 rounded-lg border border-line font-medium hover:bg-bg">Planung entfernen</button>
+      <p class="note">Geplant im ${state.plans[m.id]}. Reserve sinkt um <span class="num strong good">${eur(m.saving)}</span>.</p>
+      <button data-unplan class="btn">Planung entfernen</button>
     ` : `
-      <div class="seg grid grid-cols-4 rounded-lg bg-[#F5F5F4] p-0.5 mb-3" role="group" aria-label="Monat">
-        ${SERVICE_MONTHS.map(mo => `<button data-month="${mo}" aria-pressed="${state.pickMonth === mo}" class="py-1.5 rounded-md text-[13px] font-medium text-muted">${mo.slice(0, 3)}</button>`).join('')}
+      <div class="seg months" role="group" aria-label="Monat">
+        ${SERVICE_MONTHS.map(mo => `<button data-month="${mo}" aria-pressed="${state.pickMonth === mo}">${mo.slice(0, 3)}</button>`).join('')}
       </div>
-      <button data-plan class="w-full h-9 rounded-lg bg-ink text-white font-medium hover:bg-[#292524]">Service planen</button>
+      <button data-plan class="btn primary">Service planen</button>
     `}
-    <button data-partner class="w-full h-9 mt-2 rounded-lg border border-line font-medium hover:bg-bg ${sent ? 'text-muted' : ''}" ${sent ? 'disabled' : ''}>${sent ? 'Anfrage gesendet (Demo)' : 'Mit GRIMME-Partner buchen'}</button>
+    <button data-partner class="btn" ${sent ? 'disabled' : ''}>${sent ? 'Anfrage gesendet (Demo)' : 'Mit GRIMME-Partner buchen'}</button>
   </div>
 
-  <div class="px-6 py-5">
-    <div class="text-[12px] text-muted mb-2">Servicehistorie</div>
-    <table class="w-full">
-      <thead class="text-[12px] text-muted"><tr><th class="font-medium text-left py-1.5">Datum</th><th class="font-medium text-left py-1.5">Art</th><th class="font-medium text-right py-1.5">Kosten</th></tr></thead>
-      <tbody>${m.history.map(h => `<tr class="border-t border-line" style="cursor:default">
-        <td class="py-2 num">${date(h.date)}</td>
-        <td class="py-2 ${h.kind === 'emergency' ? 'text-bad' : ''}">${h.kind === 'emergency' ? 'Notfall' : 'Geplant'}</td>
-        <td class="py-2 text-right num">${eur(h.cost)}</td></tr>`).join('')}</tbody>
+  <div class="block">
+    <div class="label">Servicehistorie</div>
+    <table class="history">
+      <thead><tr><th>Datum</th><th>Art</th><th class="r">Kosten</th></tr></thead>
+      <tbody>${m.history.map(h => `<tr>
+        <td class="num">${date(h.date)}</td>
+        <td class="${h.kind === 'emergency' ? 'bad' : ''}">${h.kind === 'emergency' ? 'Notfall' : 'Geplant'}</td>
+        <td class="r num">${eur(h.cost)}</td></tr>`).join('')}</tbody>
     </table>
   </div>`;
 }
@@ -373,7 +435,9 @@ document.addEventListener('click', e => {
   else return;
   render();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.openId != null) { state.openId = null; render(); } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.openId != null) { state.openId = null; render(); }
+});
 
 render();
 </script>
