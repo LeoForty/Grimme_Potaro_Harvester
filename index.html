@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wartungsbudget Flotte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+  if (window.tailwind) tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          bg: '#FAFAF9', surface: '#FFFFFF', line: '#E7E5E4',
+          ink: '#1C1917', muted: '#78716C', bad: '#DC2626', good: '#16A34A'
+        }
+      }
+    }
+  };
+</script>
+<style>
+  body { font-size: 14px; font-feature-settings: "cv11"; }
+  .num { font-variant-numeric: tabular-nums; }
+  .seg button[aria-pressed="true"] { background: #FFFFFF; color: #1C1917; box-shadow: 0 0 0 1px #E7E5E4; }
+  #panel { transition: transform 220ms cubic-bezier(.2,.8,.2,1); }
+  #panel.closed { transform: translateX(100%); }
+  #scrim { transition: opacity 220ms; }
+  #scrim.closed { opacity: 0; pointer-events: none; }
+  th button:focus-visible, button:focus-visible { outline: 2px solid #1C1917; outline-offset: 2px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: #FAFAF9; }
+</style>
+</head>
+<body class="bg-bg text-ink font-sans antialiased">
+
+<main class="max-w-[1200px] mx-auto px-8 py-10">
+
+  <!-- Row 1: title + scenario -->
+  <div class="flex items-start justify-between gap-6">
+    <div>
+      <h1 class="text-[20px] font-semibold tracking-tight">Wartungsbudget Flotte</h1>
+      <p class="text-[12px] text-muted mt-1">Nächste 12 Monate · Beispieldaten</p>
+    </div>
+    <div class="flex flex-col items-end gap-1">
+      <span class="text-[12px] text-muted">Preisszenario</span>
+      <div class="seg inline-flex rounded-lg bg-[#F5F5F4] p-0.5" role="group" aria-label="Preisszenario" id="scenario"></div>
+    </div>
+  </div>
+
+  <!-- Row 2: header numbers -->
+  <section class="mt-10 grid grid-cols-4 gap-px bg-line border border-line rounded-xl overflow-hidden" id="kpis"></section>
+
+  <!-- Row 3: table -->
+  <section class="mt-10">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-[14px] font-semibold">Maschinen</h2>
+      <span class="text-[12px] text-muted" id="count"></span>
+    </div>
+    <div class="bg-surface border border-line rounded-xl overflow-hidden">
+      <table class="w-full text-left">
+        <thead class="text-[12px] text-muted border-b border-line" id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Row 4: site split -->
+  <section class="mt-10 mb-10">
+    <h2 class="text-[14px] font-semibold mb-3">Budget nach Standort</h2>
+    <div class="bg-surface border border-line rounded-xl px-6 py-5 space-y-4" id="sites"></div>
+  </section>
+</main>
+
+<!-- Detail panel -->
+<div id="scrim" class="closed fixed inset-0 bg-[#1C1917]/10"></div>
+<aside id="panel" class="closed fixed top-0 right-0 h-full w-[400px] bg-surface border-l border-line overflow-y-auto" aria-hidden="true">
+  <div id="panelBody"></div>
+</aside>
+
+<script>
+// ---------- Data + logic ----------
+const CURRENT_YEAR = 2026;
+
+const SCENARIOS = {
+  niedrig: { label: 'Niedrig', parts: 0.03, labour: 0.02 },
+  basis:   { label: 'Basis',   parts: 0.07, labour: 0.05 },
+  hoch:    { label: 'Hoch',    parts: 0.12, labour: 0.09 }
+};
+
+const TYPES = {
+  'Varitron 470': { kind: 'Kartoffelroder, selbstfahrend', base: 14000 },
+  'Rexor 6300':   { kind: 'Rübenroder',                    base: 16000 },
+  'SE 260':       { kind: 'Kartoffelroder, gezogen',       base: 7000 },
+  'GL 430':       { kind: 'Legemaschine',                  base: 3500 },
+  'BF 400':       { kind: 'Dammformer',                    base: 3000 },
+  'KS 5400':      { kind: 'Krautschläger',                 base: 2000 }
+};
+
+const P = 'planned', E = 'emergency';
+const FLEET = [
+  { id: 1,  model: 'Varitron 470', nr: 1, site: 'Nord', yearBuilt: 2019, hoursSinceService: 420, history: [['2025-01-14',P,12800],['2025-08-29',E,21400],['2024-02-02',P,11900]] },
+  { id: 2,  model: 'Varitron 470', nr: 2, site: 'Ost',  yearBuilt: 2015, hoursSinceService: 180, history: [['2025-12-10',P,15200],['2024-12-05',P,14100]] },
+  { id: 3,  model: 'Varitron 470', nr: 3, site: 'Süd',  yearBuilt: 2022, hoursSinceService: 95,  history: [['2026-02-18',P,9800],['2025-02-11',P,9400]] },
+  { id: 4,  model: 'Rexor 6300',   nr: 1, site: 'Nord', yearBuilt: 2013, hoursSinceService: 510, history: [['2024-11-20',P,17900],['2025-10-07',E,31200],['2026-10-15',E,18600],['2023-12-12',P,16400]] },
+  { id: 5,  model: 'Rexor 6300',   nr: 2, site: 'Süd',  yearBuilt: 2020, hoursSinceService: 240, history: [['2026-01-22',P,13700],['2025-01-16',P,13100]] },
+  { id: 6,  model: 'SE 260',       nr: 1, site: 'Ost',  yearBuilt: 2012, hoursSinceService: 380, history: [['2025-03-03',P,8900],['2025-09-18',E,14300],['2024-02-27',P,8200]] },
+  { id: 7,  model: 'SE 260',       nr: 2, site: 'Nord', yearBuilt: 2017, hoursSinceService: 150, history: [['2026-02-05',P,7600],['2025-02-07',P,7300]] },
+  { id: 8,  model: 'SE 260',       nr: 3, site: 'Süd',  yearBuilt: 2024, hoursSinceService: 60,  history: [['2026-03-12',P,4100],['2025-03-20',P,3900]] },
+  { id: 9,  model: 'GL 430',       nr: 1, site: 'Nord', yearBuilt: 2016, hoursSinceService: 120, history: [['2026-01-08',P,4300],['2025-01-09',P,4000],['2024-05-04',E,6100]] },
+  { id: 10, model: 'GL 430',       nr: 2, site: 'Ost',  yearBuilt: 2021, hoursSinceService: 340, history: [['2025-02-25',P,3300],['2026-04-28',E,5800]] },
+  { id: 11, model: 'BF 400',       nr: 1, site: 'Süd',  yearBuilt: 2014, hoursSinceService: 210, history: [['2025-12-02',P,4200],['2024-12-03',P,3900]] },
+  { id: 12, model: 'BF 400',       nr: 2, site: 'Ost',  yearBuilt: 2018, hoursSinceService: 90,  history: [['2026-02-26',P,3400],['2025-03-04',P,3200]] },
+  { id: 13, model: 'KS 5400',      nr: 1, site: 'Nord', yearBuilt: 2023, hoursSinceService: 40,  history: [['2026-03-02',P,1500],['2025-03-06',P,1400]] },
+  { id: 14, model: 'KS 5400',      nr: 2, site: 'Süd',  yearBuilt: 2013, hoursSinceService: 330, history: [['2025-01-28',P,2600],['2025-09-02',E,4100],['2024-01-30',P,2400]] },
+  { id: 15, model: 'Rexor 6300',   nr: 3, site: 'Ost',  yearBuilt: 2025, hoursSinceService: 30,  history: [['2026-09-01',P,6200],['2026-03-15',P,5900]] }
+].map(m => ({
+  ...m,
+  name: `${m.model} #${m.nr}`,
+  type: TYPES[m.model].kind,
+  base: TYPES[m.model].base,
+  age: CURRENT_YEAR - m.yearBuilt,
+  history: m.history.map(([date, kind, cost]) => ({ date, kind, cost })).sort((a, b) => b.date.localeCompare(a.date))
+}));
+
+const SERVICE_MONTHS = ['Dezember', 'Januar', 'Februar', 'März'];
+
+const state = {
+  scenario: 'basis',
+  plans: {},            // id -> month
+  sort: { key: 'status', dir: 1 },
+  openId: null,
+  pickMonth: 'Januar',
+  partnerSent: {}
+};
+
+const priceFactor = s => 1 + 0.6 * SCENARIOS[s].parts + 0.4 * SCENARIOS[s].labour;
+const isOverdue = m => m.hoursSinceService > 300;
+
+function forecast(m, scenario, planned) {
+  const pf = priceFactor(scenario);
+  const regular = m.base * (1 + 0.07 * m.age) * pf;
+  const chance = planned ? 0.05 : (isOverdue(m) ? 0.35 : 0.10);
+  const reserve = chance * m.base * 2 * pf;
+  return { regular, reserve, chance, total: regular + reserve };
+}
+
+function machineView(m, scenario = state.scenario) {
+  const planned = !!state.plans[m.id];
+  const now = forecast(m, scenario, planned);
+  const before = forecast(m, scenario, false);
+  const status = planned ? 'planned' : (isOverdue(m) ? 'overdue' : 'normal');
+  return { ...m, ...now, status, saving: before.reserve - now.reserve, without: before, withPlan: forecast(m, scenario, true) };
+}
+
+function fleetTotals(scenario = state.scenario) {
+  const rows = FLEET.map(m => machineView(m, scenario));
+  const sum = k => rows.reduce((a, r) => a + r[k], 0);
+  return { rows, total: sum('total'), regular: sum('regular'), reserve: sum('reserve'), saving: sum('saving') };
+}
+
+// Batch 1 check
+for (const s of Object.keys(SCENARIOS)) console.log(`Flotte gesamt (${SCENARIOS[s].label}):`, Math.round(fleetTotals(s).total));
+
+// ---------- Formatting ----------
+const nf = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+const eur = v => `${nf.format(Math.round(v))} €`;
+const pct = v => `${nf.format(Math.round(v * 100))} %`;
+const date = iso => { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const STATUS = {
+  overdue: { label: 'Überfällig', cls: 'text-bad',   dot: 'bg-bad' },
+  normal:  { label: 'Normal',     cls: 'text-muted', dot: 'bg-line' },
+  planned: { label: 'Geplant',    cls: 'text-good',  dot: 'bg-good' }
+};
+const STATUS_RANK = { overdue: 0, normal: 1, planned: 2 };
+
+// ---------- Render ----------
+function renderScenario() {
+  document.getElementById('scenario').innerHTML = Object.entries(SCENARIOS).map(([k, s]) =>
+    `<button data-scn="${k}" aria-pressed="${state.scenario === k}" class="px-4 py-1.5 rounded-md text-[13px] font-medium text-muted">${s.label}</button>`
+  ).join('');
+}
+
+function kpi(label, value, extra = '') {
+  return `<div class="bg-surface px-6 py-5">
+    <div class="text-[12px] text-muted">${label}</div>
+    <div class="num text-[32px] font-semibold tracking-tight mt-1 ${extra}">${value}</div>
+  </div>`;
+}
+
+function renderKpis(t) {
+  const hasPlan = Object.keys(state.plans).length > 0;
+  const el = document.getElementById('kpis');
+  el.className = `mt-10 grid ${hasPlan ? 'grid-cols-4' : 'grid-cols-3'} gap-px bg-line border border-line rounded-xl overflow-hidden`;
+  el.innerHTML =
+    kpi('Gesamt 12 Monate', eur(t.total)) +
+    kpi('Geplanter Service', eur(t.regular)) +
+    kpi('Notfall-Reserve', eur(t.reserve)) +
+    (hasPlan ? kpi('Eingespart', eur(t.saving), 'text-good') : '');
+}
+
+const COLS = [
+  { key: 'name', label: 'Maschine' },
+  { key: 'type', label: 'Typ' },
+  { key: 'site', label: 'Standort' },
+  { key: 'age', label: 'Alter', num: true },
+  { key: 'hoursSinceService', label: 'Std. seit Service', num: true },
+  { key: 'total', label: 'Prognose', num: true },
+  { key: 'status', label: 'Status' }
+];
+
+function sortRows(rows) {
+  const { key, dir } = state.sort;
+  return rows.slice().sort((a, b) => {
+    if (key === 'status') {
+      const d = STATUS_RANK[a.status] - STATUS_RANK[b.status];
+      return d !== 0 ? d * dir : b.total - a.total;
+    }
+    const av = a[key], bv = b[key];
+    // dir 1 = default: numbers high to low, text A to Z
+    const d = typeof av === 'number' ? bv - av : String(av).localeCompare(String(bv), 'de');
+    return d * dir;
+  });
+}
+
+function renderTable(t) {
+  document.getElementById('thead').innerHTML = `<tr>${COLS.map(c => {
+    const active = state.sort.key === c.key;
+    const arrow = active ? (state.sort.dir === 1 ? '↓' : '↑') : '';
+    return `<th class="font-medium px-4 py-3 ${c.num ? 'text-right' : ''}" aria-sort="${active ? (state.sort.dir === 1 ? 'descending' : 'ascending') : 'none'}">
+      <button data-sort="${c.key}" class="inline-flex items-center gap-1 hover:text-ink ${active ? 'text-ink' : ''}">${c.label}<span class="w-3 inline-block">${arrow}</span></button></th>`;
+  }).join('')}</tr>`;
+
+  const rows = sortRows(t.rows);
+  document.getElementById('tbody').innerHTML = rows.map(r => {
+    const s = STATUS[r.status];
+    const sel = state.openId === r.id ? 'bg-bg' : '';
+    return `<tr data-id="${r.id}" class="border-b border-line last:border-0 ${sel}">
+      <td class="px-4 py-3 font-medium">${esc(r.name)}</td>
+      <td class="px-4 py-3 text-muted">${esc(r.type)}</td>
+      <td class="px-4 py-3">${r.site}</td>
+      <td class="px-4 py-3 text-right num">${r.age} J.</td>
+      <td class="px-4 py-3 text-right num ${r.status === 'overdue' ? 'text-bad' : ''}">${nf.format(r.hoursSinceService)}</td>
+      <td class="px-4 py-3 text-right num font-medium">${eur(r.total)}</td>
+      <td class="px-4 py-3"><span class="inline-flex items-center gap-2 ${s.cls}"><span class="w-1.5 h-1.5 rounded-full ${s.dot}"></span>${s.label}${r.status === 'planned' ? ` · ${state.plans[r.id]}` : ''}</span></td>
+    </tr>`;
+  }).join('');
+
+  const overdue = t.rows.filter(r => r.status === 'overdue').length;
+  const planned = t.rows.filter(r => r.status === 'planned').length;
+  document.getElementById('count').textContent = `${t.rows.length} Maschinen · ${overdue} überfällig · ${planned} geplant`;
+}
+
+function renderSites(t) {
+  const sites = ['Nord', 'Ost', 'Süd'].map(site => {
+    const rs = t.rows.filter(r => r.site === site);
+    const sum = k => rs.reduce((a, r) => a + r[k], 0);
+    return { site, n: rs.length, total: sum('total'), regular: sum('regular'), reserve: sum('reserve') };
+  });
+  const max = Math.max(...sites.map(s => s.total));
+  document.getElementById('sites').innerHTML = sites.map(s => `
+    <div class="grid grid-cols-[120px_1fr_140px] items-center gap-6">
+      <div><div class="font-medium">${s.site}</div><div class="text-[12px] text-muted">${s.n} Maschinen</div></div>
+      <div>
+        <div class="flex h-2 rounded-full overflow-hidden bg-[#F5F5F4]" style="width:${(s.total / max * 100).toFixed(1)}%">
+          <div class="bg-ink" style="width:${(s.regular / s.total * 100).toFixed(1)}%"></div>
+          <div class="bg-muted/40" style="width:${(s.reserve / s.total * 100).toFixed(1)}%"></div>
+        </div>
+        <div class="text-[12px] text-muted mt-1.5 num">Service ${eur(s.regular)} · Reserve ${eur(s.reserve)}</div>
+      </div>
+      <div class="text-right num font-semibold text-[16px]">${eur(s.total)}</div>
+    </div>`).join('') +
+    `<div class="flex gap-5 text-[12px] text-muted pt-1">
+      <span class="inline-flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-ink"></span>Geplanter Service</span>
+      <span class="inline-flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-muted/40"></span>Notfall-Reserve</span>
+    </div>`;
+}
+
+function renderPanel() {
+  const panel = document.getElementById('panel'), scrim = document.getElementById('scrim');
+  if (state.openId == null) {
+    panel.classList.add('closed'); scrim.classList.add('closed'); panel.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  panel.classList.remove('closed'); scrim.classList.remove('closed'); panel.setAttribute('aria-hidden', 'false');
+
+  const m = machineView(FLEET.find(x => x.id === state.openId));
+  const s = STATUS[m.status];
+  const planned = m.status === 'planned';
+  const sent = state.partnerSent[m.id];
+
+  document.getElementById('panelBody').innerHTML = `
+  <div class="px-6 py-5 border-b border-line flex items-start justify-between">
+    <div>
+      <div class="text-[16px] font-semibold">${esc(m.name)}</div>
+      <div class="text-[12px] text-muted mt-0.5">${esc(m.type)} · ${m.site} · Baujahr ${m.yearBuilt}</div>
+      <div class="mt-2 inline-flex items-center gap-2 text-[13px] ${s.cls}"><span class="w-1.5 h-1.5 rounded-full ${s.dot}"></span>${s.label}${planned ? ` · ${state.plans[m.id]}` : ''} · ${nf.format(m.hoursSinceService)} Std.</div>
+    </div>
+    <button data-close class="w-8 h-8 -mr-2 rounded-md text-muted hover:text-ink hover:bg-bg text-[20px] leading-none" aria-label="Schließen">×</button>
+  </div>
+
+  <div class="px-6 py-5 border-b border-line">
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <div class="text-[12px] text-muted">Ohne Planung</div>
+        <div class="num text-[24px] font-semibold mt-0.5 ${planned ? 'text-muted' : ''}">${eur(m.without.total)}</div>
+      </div>
+      <div>
+        <div class="text-[12px] text-muted">Mit Planung</div>
+        <div class="num text-[24px] font-semibold mt-0.5 ${planned ? 'text-good' : ''}">${eur(m.withPlan.total)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="px-6 py-5 border-b border-line">
+    <div class="text-[12px] text-muted mb-2">Kostenaufteilung</div>
+    <dl class="num space-y-1.5">
+      <div class="flex justify-between"><dt>Regulärer Service</dt><dd>${eur(m.regular)}</dd></div>
+      <div class="flex justify-between"><dt>Notfall-Reserve <span class="text-muted">(${pct(m.chance)})</span></dt><dd>${eur(m.reserve)}</dd></div>
+      <div class="flex justify-between pt-1.5 border-t border-line font-semibold"><dt>Prognose</dt><dd>${eur(m.total)}</dd></div>
+    </dl>
+  </div>
+
+  <div class="px-6 py-5 border-b border-line">
+    <div class="text-[12px] text-muted mb-2">Service planen</div>
+    ${planned ? `
+      <p class="mb-3">Geplant im ${state.plans[m.id]}. Reserve sinkt um <span class="num font-medium text-good">${eur(m.saving)}</span>.</p>
+      <button data-unplan class="w-full h-9 rounded-lg border border-line font-medium hover:bg-bg">Planung entfernen</button>
+    ` : `
+      <div class="seg grid grid-cols-4 rounded-lg bg-[#F5F5F4] p-0.5 mb-3" role="group" aria-label="Monat">
+        ${SERVICE_MONTHS.map(mo => `<button data-month="${mo}" aria-pressed="${state.pickMonth === mo}" class="py-1.5 rounded-md text-[13px] font-medium text-muted">${mo.slice(0, 3)}</button>`).join('')}
+      </div>
+      <button data-plan class="w-full h-9 rounded-lg bg-ink text-white font-medium hover:bg-[#292524]">Service planen</button>
+    `}
+    <button data-partner class="w-full h-9 mt-2 rounded-lg border border-line font-medium hover:bg-bg ${sent ? 'text-muted' : ''}" ${sent ? 'disabled' : ''}>${sent ? 'Anfrage gesendet (Demo)' : 'Mit GRIMME-Partner buchen'}</button>
+  </div>
+
+  <div class="px-6 py-5">
+    <div class="text-[12px] text-muted mb-2">Servicehistorie</div>
+    <table class="w-full">
+      <thead class="text-[12px] text-muted"><tr><th class="font-medium text-left py-1.5">Datum</th><th class="font-medium text-left py-1.5">Art</th><th class="font-medium text-right py-1.5">Kosten</th></tr></thead>
+      <tbody>${m.history.map(h => `<tr class="border-t border-line" style="cursor:default">
+        <td class="py-2 num">${date(h.date)}</td>
+        <td class="py-2 ${h.kind === 'emergency' ? 'text-bad' : ''}">${h.kind === 'emergency' ? 'Notfall' : 'Geplant'}</td>
+        <td class="py-2 text-right num">${eur(h.cost)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function render() {
+  const t = fleetTotals();
+  renderScenario(); renderKpis(t); renderTable(t); renderSites(t); renderPanel();
+}
+
+// ---------- Events ----------
+document.addEventListener('click', e => {
+  const b = e.target.closest('button, tr[data-id], #scrim');
+  if (!b) return;
+  if (b.dataset.scn) state.scenario = b.dataset.scn;
+  else if (b.dataset.sort) {
+    const k = b.dataset.sort;
+    state.sort = state.sort.key === k ? { key: k, dir: -state.sort.dir } : { key: k, dir: 1 };
+  }
+  else if (b.dataset.id) { state.openId = +b.dataset.id; state.pickMonth = 'Januar'; }
+  else if (b.id === 'scrim' || 'close' in b.dataset) state.openId = null;
+  else if (b.dataset.month) state.pickMonth = b.dataset.month;
+  else if ('plan' in b.dataset) state.plans[state.openId] = state.pickMonth;
+  else if ('unplan' in b.dataset) delete state.plans[state.openId];
+  else if ('partner' in b.dataset) state.partnerSent[state.openId] = true;
+  else return;
+  render();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.openId != null) { state.openId = null; render(); } });
+
+render();
+</script>
+</body>
+</html>
