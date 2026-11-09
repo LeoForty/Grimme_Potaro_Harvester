@@ -47,8 +47,7 @@
   .section-head h2 { font-size: 14px; font-weight: 600; }
 
   .kpis { display: grid; gap: 1px; background: var(--line); }
-  .kpis.c3 { grid-template-columns: repeat(3, 1fr); }
-  .kpis.c4 { grid-template-columns: repeat(4, 1fr); }
+  .kpis.c3, .kpis.c4 { display: none; }
   .kpi { background: var(--surface); padding: 20px 24px; }
   .kpi .value { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
 
@@ -114,13 +113,48 @@
   .overview td { padding: 10px 16px; border-bottom: 1px solid var(--line); }
   .overview tbody tr:last-child td { border-bottom: 0; }
   .overview tfoot td { padding: 10px 16px; border-top: 1px solid var(--line); font-weight: 600; }
+  .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .side { border-right: 1px solid var(--line); background: var(--surface); padding: 24px 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 28px; }
+  .logo { display: flex; align-items: center; height: 32px; padding: 0 8px; }
+  .logo img { height: 22px; }
+  .logo .word { font-weight: 600; letter-spacing: 0.14em; font-size: 15px; }
+  .nav { display: grid; gap: 2px; }
+  .nav a { display: block; padding: 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-weight: 500; }
+  .nav a:hover { background: var(--bg); color: var(--ink); }
+  .side .foot { margin-top: auto; padding: 0 8px; }
+  .page { padding: 32px 40px; }
+  .dash { display: grid; grid-template-columns: 280px 1fr; gap: 16px; margin-top: 32px; }
+  .stack { display: grid; gap: 16px; }
+  .stack .kpi { border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  .stack .kpi .value { font-size: 28px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 16px; margin-top: 16px; }
+  .tile { padding: 20px 24px; }
+  .tile-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .tile-head h2 { font-size: 14px; font-weight: 600; }
+  svg text { font: 500 11px Inter, system-ui, sans-serif; fill: var(--muted); }
+  .donut { display: flex; align-items: center; gap: 20px; }
+  .risk li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .risk li:first-child { border-top: 0; padding-top: 0; }
+  .risk li:hover .strong { text-decoration: underline; }
+  .risk { list-style: none; margin: 0; padding: 0; }
   .history th { padding: 6px 0; border-bottom: 0; }
   .history td { padding: 8px 0; border-top: 1px solid var(--line); }
 </style>
 </head>
 <body>
 
-<main class="page">
+<div class="shell">
+<nav class="side" aria-label="Navigation">
+  <div class="logo"><img src="grimme-logo.svg" alt="GRIMME" onerror="this.outerHTML='<span class=&quot;word&quot;>GRIMME</span>'"></div>
+  <div class="nav">
+    <a href="#top">Dashboard</a>
+    <a href="#maschinen">Maschinen</a>
+    <a href="#uebersicht">Übersicht</a>
+    <a href="#standorte">Standorte</a>
+  </div>
+  <div class="foot label">Beispieldaten · Stand 2026</div>
+</nav>
+<main class="page" id="top">
   <div class="topbar">
     <div>
       <h1>Wartungsbudget Flotte</h1>
@@ -132,9 +166,31 @@
     </div>
   </div>
 
-  <section class="card kpis c3" id="kpis"></section>
+  <div class="dash">
+    <div class="stack" id="kpiStack"></div>
+    <div class="card tile">
+      <div class="tile-head"><h2>Kosten pro Monat</h2><span class="label" id="monthLegend"></span></div>
+      <div id="monthChart"></div>
+    </div>
+  </div>
 
-  <section>
+  <div class="row3">
+    <div class="card tile">
+      <div class="tile-head"><h2>Planbarer Anteil</h2></div>
+      <div class="donut" id="donut"></div>
+    </div>
+    <div class="card tile">
+      <div class="tile-head"><h2>Höchstes Risiko</h2><span class="label">Notfall-Reserve</span></div>
+      <ul class="risk" id="risk"></ul>
+    </div>
+    <div class="card tile">
+      <div class="tile-head"><h2>Szenarien</h2><span class="label">Gesamt 12 Monate</span></div>
+      <div id="scnChart"></div>
+    </div>
+  </div>
+  <div id="kpis" hidden></div>
+
+  <section id="maschinen">
     <div class="section-head">
       <h2>Maschinen</h2>
       <span class="label" id="count"></span>
@@ -147,7 +203,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="uebersicht">
     <div class="section-head"><h2>Übersicht</h2><span class="label">Szenario folgt Auswahl</span></div>
     <div class="overview">
       <div class="card"><table id="bySite"></table></div>
@@ -155,11 +211,12 @@
     </div>
   </section>
 
-  <section>
+  <section id="standorte">
     <div class="section-head"><h2>Budget nach Standort</h2></div>
     <div class="card sites" id="sites"></div>
   </section>
 </main>
+</div>
 
 <div id="scrim" class="scrim closed"></div>
 <aside id="panel" class="panel closed" aria-hidden="true" aria-label="Maschinendetails">
@@ -388,6 +445,81 @@ function renderOverview(t) {
   groupTable('byType', 'Kategorie', t.rows, r => r.type, [...new Set(Object.values(TYPES).map(x => x.kind))]);
 }
 
+const MONTHS = ['Nov','Dez','Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt'];
+const MONTH_IDX = { Dezember: 1, Januar: 2, Februar: 3, 'März': 4 };
+// Cash-out per month: regular service lands in its planned month (default Feb for normal,
+// in harvest Aug-Oct for overdue machines nobody planned); reserve spread over harvest Aug-Oct.
+function monthly(t) {
+  const reg = Array(12).fill(0), res = Array(12).fill(0);
+  for (const r of t.rows) {
+    if (r.status === 'planned') reg[MONTH_IDX[state.plans[r.id]]] += r.regular;
+    else if (r.status === 'overdue') [9, 10, 11].forEach(i => reg[i] += r.regular / 3);
+    else reg[3] += r.regular;
+    [9, 10, 11].forEach(i => res[i] += r.reserve / 3);
+  }
+  return { reg, res };
+}
+
+function renderMonthChart(t) {
+  const { reg, res } = monthly(t);
+  const W = 760, H = 330, pl = 44, pb = 24, pt = 8, bw = (W - pl) / 12;
+  const max = Math.max(...reg.map((v, i) => v + res[i])) * 1.1;
+  const y = v => pt + (H - pt - pb) * (1 - v / max);
+  const ticks = [0, 0.5, 1].map(f => max / 1.1 * f);
+  let g = ticks.map(v => `<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#E7E5E4"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${nf.format(Math.round(v / 1000))}k</text>`).join('');
+  g += `<rect x="${pl + bw}" y="${pt}" width="${bw * 4}" height="${H - pt - pb}" fill="#F5F5F4"/><text x="${pl + bw * 3}" y="${pt + 14}" text-anchor="middle">Nebensaison</text>`;
+  g += reg.map((v, i) => {
+    const x = pl + i * bw + bw * 0.22, w = bw * 0.56;
+    return `<rect x="${x}" y="${y(v)}" width="${w}" height="${y(0) - y(v)}" fill="#1C1917" rx="2"><title>${MONTHS[i]}: Service ${eur(v)}</title></rect>` +
+      (res[i] ? `<rect x="${x}" y="${y(v + res[i])}" width="${w}" height="${y(v) - y(v + res[i])}" fill="#D6D3D1" rx="2"><title>${MONTHS[i]}: Reserve ${eur(res[i])}</title></rect>` : '') +
+      `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${MONTHS[i]}</text>`;
+  }).join('');
+  document.getElementById('monthChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Kosten pro Monat">${g}</svg>`;
+  document.getElementById('monthLegend').innerHTML = `<span class="legend"><span><span class="swatch" style="background:var(--ink)"></span>Service</span><span><span class="swatch" style="background:#D6D3D1"></span>Reserve</span></span>`;
+}
+
+function renderKpiStack(t) {
+  const hasPlan = Object.keys(state.plans).length > 0;
+  document.getElementById('kpiStack').innerHTML =
+    kpi('Gesamt 12 Monate', eur(t.total)) +
+    kpi('Geplanter Service', eur(t.regular)) +
+    kpi('Notfall-Reserve', eur(t.reserve)) +
+    (hasPlan ? kpi('Eingespart', eur(t.saving), 'good') : '');
+}
+
+function renderDonut(t) {
+  const share = t.regular / t.total, R = 52, C = 2 * Math.PI * R;
+  document.getElementById('donut').innerHTML = `
+    <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label="Planbarer Anteil">
+      <circle cx="66" cy="66" r="${R}" fill="none" stroke="#E7E5E4" stroke-width="12"/>
+      <circle cx="66" cy="66" r="${R}" fill="none" stroke="#1C1917" stroke-width="12" stroke-dasharray="${C * share} ${C}" transform="rotate(-90 66 66)"/>
+      <text x="66" y="72" text-anchor="middle" style="font-size:20px;font-weight:600;fill:#1C1917">${pct(share)}</text>
+    </svg>
+    <dl class="split num" style="flex:1">
+      <div><dt class="muted">Service</dt><dd>${eur(t.regular)}</dd></div>
+      <div><dt class="muted">Reserve</dt><dd>${eur(t.reserve)}</dd></div>
+    </dl>`;
+}
+
+function renderRisk(t) {
+  const top = t.rows.filter(r => r.status !== 'planned').sort((a, b) => b.reserve - a.reserve).slice(0, 5);
+  document.getElementById('risk').innerHTML = top.map(r => `
+    <li data-risk="${r.id}"><span><span class="strong">${esc(r.name)}</span><br><span class="label">${r.site} · ${nf.format(r.hoursSinceService)} Std.</span></span>
+    <span class="num ${r.status === 'overdue' ? 'bad' : ''}">${eur(r.reserve)}</span></li>`).join('');
+}
+
+function renderScenarioChart() {
+  const vals = Object.keys(SCENARIOS).map(k => ({ k, v: fleetTotals(k).total }));
+  const W = 300, H = 150, max = Math.max(...vals.map(x => x.v)), min = Math.min(...vals.map(x => x.v)) * 0.9;
+  const bw = W / 3;
+  document.getElementById('scnChart').innerHTML = `<svg viewBox="0 0 ${W} ${H + 56}" width="100%" role="img" aria-label="Szenarien"><g transform="translate(0 20)">${vals.map((x, i) => {
+    const h = H * (x.v - min) / (max - min) * 0.75 + H * 0.2, cur = x.k === state.scenario;
+    return `<rect x="${i * bw + bw * 0.25}" y="${H - h}" width="${bw * 0.5}" height="${h}" rx="3" fill="${cur ? '#1C1917' : '#D6D3D1'}"/>
+      <text x="${i * bw + bw / 2}" y="${H - h - 6}" text-anchor="middle" style="${cur ? 'fill:#1C1917' : ''}">${nf.format(Math.round(x.v / 1000))}k €</text>
+      <text x="${i * bw + bw / 2}" y="${H + 18}" text-anchor="middle" style="${cur ? 'fill:#1C1917;font-weight:600' : ''}">${SCENARIOS[x.k].label}</text>`;
+  }).join('')}</g></svg>`;
+}
+
 function renderPanel() {
   const panel = document.getElementById('panel'), scrim = document.getElementById('scrim');
   const open = state.openId != null;
@@ -452,18 +584,19 @@ function renderPanel() {
 
 function render() {
   const t = fleetTotals();
-  renderScenario(); renderKpis(t); renderTable(t); renderOverview(t); renderSites(t); renderPanel();
+  renderScenario(); renderKpis(t); renderKpiStack(t); renderMonthChart(t); renderDonut(t); renderRisk(t); renderScenarioChart(); renderTable(t); renderOverview(t); renderSites(t); renderPanel();
 }
 
 // ---------- Events ----------
 document.addEventListener('click', e => {
-  const b = e.target.closest('button, tr[data-id], #scrim');
+  const b = e.target.closest('button, tr[data-id], li[data-risk], #scrim');
   if (!b) return;
   if (b.dataset.scn) state.scenario = b.dataset.scn;
   else if (b.dataset.sort) {
     const k = b.dataset.sort;
     state.sort = state.sort.key === k ? { key: k, dir: -state.sort.dir } : { key: k, dir: 1 };
   }
+  else if (b.dataset.risk) { state.openId = +b.dataset.risk; state.pickMonth = 'Januar'; }
   else if (b.dataset.id) { state.openId = +b.dataset.id; state.pickMonth = 'Januar'; }
   else if (b.id === 'scrim' || 'close' in b.dataset) state.openId = null;
   else if (b.dataset.month) state.pickMonth = b.dataset.month;
